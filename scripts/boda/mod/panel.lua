@@ -198,8 +198,8 @@ local function playlist_rows()
         elseif sort == "quality" and m.pixels > 0 then
             hint = string.format("%.1fMP", m.pixels / 1000000)
         end
-        -- 팟플레이어와 같게: 한 번 클릭은 고르기, 두 번 클릭이 재생.
-        -- (한 번 클릭으로 바로 재생하면 스크롤하다 잘못 눌러 보던 걸 놓친다)
+        -- 한 번 클릭하면 바로 재생한다.
+        -- 이미 재생 중인 항목이면 다시 시작하지 않는다 (두 번 클릭해도 처음으로 안 돌아가게).
         rows[#rows + 1] = {
             text = e.title or util.basename(path),
             hint = hint,
@@ -207,12 +207,11 @@ local function playlist_rows()
             selected = (selected == idx),
             click = function()
                 selected = idx
-                draw()
-            end,
-            dbl = function()
-                selected = idx
-                mp.commandv("playlist-play-index", idx)
+                if mp.get_property_number("playlist-pos") ~= idx then
+                    mp.commandv("playlist-play-index", idx)
+                end
                 mp.set_property_bool("pause", false)
+                draw()
             end,
         }
     end

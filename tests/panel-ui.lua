@@ -12,6 +12,7 @@ local mp = require("mp")
 local pass, fail = 0, 0
 local queue, qi = {}, 0
 local saved = {}
+local loads = 0 -- 파일이 몇 번 새로 읽혔는지 (같은 항목을 다시 눌렀을 때 재시작하는지 확인용)
 
 local function log(s) mp.msg.warn("T " .. s) end
 
@@ -132,34 +133,38 @@ end)
 
 -- ── 2. 목록에서 다른 화 고르기 ──────────────────────────────────────
 step(0.3, function()
-    log("[2] 고르기와 재생")
-    saved.pos0 = mp.get_property_number("playlist-pos")
+    log("[2] 클릭해서 재생")
     saved.target = info().scroll + 2
     local x, y = row_xy(3)
     click(x, y)
 end)
 
-step(0.6, function()
-    check("한 번 클릭은 고르기만 한다", mp.get_property_number("playlist-pos") == saved.pos0,
-        "pos=" .. tostring(mp.get_property_number("playlist-pos")))
-    check("클릭해도 재생이 멈추지 않는다", mp.get_property_bool("pause") == false,
-        "pause=" .. tostring(mp.get_property("pause")))
-end)
-
-step(0.3, function()
-    local x, y = row_xy(3)
-    dblclick(x, y)
-end)
-
 step(0.8, function()
-    check("더블클릭하면 그 화가 재생된다", mp.get_property_number("playlist-pos") == saved.target,
-        "pos=" .. tostring(mp.get_property_number("playlist-pos")))
-    check("더블클릭이 일시정지로 새지 않는다", mp.get_property_bool("pause") == false,
+    check("한 번 클릭하면 그 화가 재생된다", mp.get_property_number("playlist-pos") == saved.target,
+        "pos=" .. tostring(mp.get_property_number("playlist-pos")) ..
+        " (기대 " .. tostring(saved.target) .. ")")
+    check("클릭해도 재생이 멈추지 않는다", mp.get_property_bool("pause") == false,
         "pause=" .. tostring(mp.get_property("pause")))
     local n = info()
     local cur = (mp.get_property_number("playlist-pos") or 0) + 1
     check("재생 중인 항목이 화면 안에 보인다", cur > n.scroll and cur <= n.scroll + n.vis,
         "scroll=" .. tostring(n.scroll))
+end)
+
+-- 습관적으로 두 번 누르는 사람: 보던 게 처음부터 다시 시작되면 안 된다
+step(0.5, function()
+    saved.loads = loads
+    local n = info()
+    local visible_row = (mp.get_property_number("playlist-pos") or 0) - n.scroll + 1
+    local x, y = row_xy(visible_row)
+    dblclick(x, y)
+end)
+
+step(0.8, function()
+    check("재생 중인 항목을 두 번 눌러도 다시 시작되지 않는다", loads == saved.loads,
+        "파일 읽기 " .. tostring(loads - saved.loads) .. "회 더 발생")
+    check("두 번 클릭이 일시정지로 새지 않는다", mp.get_property_bool("pause") == false,
+        "pause=" .. tostring(mp.get_property("pause")))
 end)
 
 -- ── 3. 커서 아래 줄 강조 ────────────────────────────────────────────
@@ -425,5 +430,6 @@ step(1.2, function()
 end)
 
 mp.register_event("file-loaded", function()
+    loads = loads + 1
     if qi == 0 then mp.add_timeout(0.5, run_next) end
 end)
