@@ -199,7 +199,7 @@ end)
 step(0.6, function()
     local t = tree()
     check("목록 위에서는 그 줄에 대한 메뉴", meta().kind == "playlist", tostring(meta().kind))
-    saved.playlist_menu_seen = meta().kind == "playlist" 
+    saved.playlist_menu_seen = meta().kind == "playlist"
     check("재생·빼기 항목이 있다", find(t, "재생") ~= nil and find(t, "목록에서 빼기") ~= nil)
     check("정렬 하위메뉴가 붙는다", find(t, "정렬") ~= nil)
     check("항목 수가 기본 메뉴보다 적다", count_all(t) < saved.total,
