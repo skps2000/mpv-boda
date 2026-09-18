@@ -7,43 +7,43 @@ on:
 
 jobs:
   luacheck:
-    name: Lua 문법 검사
+    name: Lua
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: luacheck 설치
+      - name: Install luacheck
         run: |
           sudo apt-get update
           sudo apt-get install -y lua5.1 luarocks
           sudo luarocks install luacheck
 
-      - name: 검사
+      - name: Check
         run: luacheck scripts tests
 
   config:
-    name: 설정 파일 검사
+    name: Config files
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: input.conf 중복 키 확인
+      - name: No key bound twice in input.conf
         run: |
           dup=$(awk '/^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
                      { if (seen[$1]) print $1; else seen[$1]=1 }' input.conf)
           if [ -n "$dup" ]; then
-            echo "같은 키가 두 번 정의됨:"; echo "$dup"; exit 1
+            echo "bound twice:"; echo "$dup"; exit 1
           fi
 
-      - name: mpv.conf 따옴표 확인
+      - name: Values needing quotes in mpv.conf
         run: |
-          # 값이 # 나 % 로 시작하면 따옴표가 있어야 한다 (없으면 mpv 가 그 줄을 버린다)
+          # a value starting with # or % has to be quoted, or mpv drops the line
           bad=$(grep -nE '^[a-z0-9-]+=[#%]' mpv.conf || true)
           if [ -n "$bad" ]; then
-            echo "따옴표가 필요한 값:"; echo "$bad"; exit 1
+            echo "needs quotes:"; echo "$bad"; exit 1
           fi
 
-      - name: input.conf 가 부르는 동작이 실제로 있는지 확인
+      - name: Every action input.conf calls exists
         run: |
           {
             grep -o 'script-binding boda/[a-z0-9-]*' input.conf | sed 's|.*boda/||'
@@ -57,5 +57,5 @@ jobs:
           } | sort -u > registered.txt
           missing=$(comm -23 used.txt registered.txt)
           if [ -n "$missing" ]; then
-            echo "input.conf 가 부르는데 스크립트에 없는 동작:"; echo "$missing"; exit 1
+            echo "called by input.conf but not registered:"; echo "$missing"; exit 1
           fi

@@ -1,16 +1,16 @@
--- 기록/설정 저장. 설정 폴더가 아니라 mpv 상태 폴더(~~state)에 둔다.
--- 설정 폴더는 그대로 공개(저장소)할 수 있어야 하고, 시청 기록은 개인 정보다.
+-- History and preferences. They live in mpv's state dir (~~state), not in the
+-- config dir, so the config dir stays safe to publish while what you watched stays private.
 local mp = require("mp")
 local util = require("lib.util")
 local opts = require("lib.options")
 
 local M = {
-    history = {},   -- { {path=, pos=, dur=, seen=}, ... } 최근 순
-    bookmarks = {}, -- path -> { 초, ... }
-    favorites = {}, -- path -> { {a=시작, b=끝, name=이름}, ... }
+    history = {},   -- { {path=, pos=, dur=, seen=}, ... } newest first
+    bookmarks = {}, -- path -> { seconds, ... }
+    favorites = {}, -- path -> { {a=start, b=end, name=label}, ... }
     skips = {},     -- path -> {intro=, outro=}
-    recent = {},    -- 최근 폴더
-    prefs = {},     -- 패널 너비, 정렬, 색보정 자동 여부
+    recent = {},    -- recently opened folders
+    prefs = {},     -- panel width, sorting, auto colour
 }
 
 local files = {}
@@ -72,7 +72,7 @@ function M.flush()
     dirty = {}
 end
 
--- 폴더 경로를 최근 목록 맨 앞으로 올린다.
+-- Move a folder to the front of the recent list.
 function M.remember_folder(dir)
     if not dir or dir == "" or util.is_url(dir) then return end
     dir = dir:gsub("[\\/]+$", "")
@@ -85,7 +85,7 @@ function M.remember_folder(dir)
     M.mark("prefs")
 end
 
--- 없어진 폴더를 최근 목록에서 뺀다.
+-- Drop a folder that is no longer there.
 function M.forget_folder(dir)
     if not dir then return end
     local out = {}
@@ -106,14 +106,14 @@ end
 function M.set_bookmarks(path, list)
     if not path then return end
     if #list == 0 then
-        M.bookmarks[path] = nil -- 빈 항목까지 남기면 파일이 계속 커진다
+        M.bookmarks[path] = nil -- keeping empty entries would grow the file forever
     else
         M.bookmarks[path] = list
     end
     M.mark("bookmarks")
 end
 
--- 즐겨찾기 구간: 파일마다 {a, b, name} 목록
+-- Saved clips: {a, b, name} per file
 function M.favorites_of(path)
     if not path then return {} end
     local list = M.favorites[path]

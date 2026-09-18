@@ -1,30 +1,31 @@
--- 파일별 오프닝/엔딩 구간 기억과 자동 넘기기.
+-- Remembers intro and outro points per file and skips them next time.
 local mp = require("mp")
 local util = require("lib.util")
 local state = require("lib.state")
+local t = require("lib.i18n").t
 
 local M = {}
 
 local watching = false
 local done = false
 
-local function check(_, t)
-    if not t or done then return end
+local function check(_, pos)
+    if not pos or done then return end
     local path = mp.get_property("path")
     local s = state.skip_of(path)
     if not s or (s.outro or 0) <= 0 then return end
-    if t < s.outro then return end
+    if pos < s.outro then return end
     done = true
     local count = mp.get_property_number("playlist-count") or 1
     local pos = mp.get_property_number("playlist-pos") or 0
     if pos + 1 < count then
         mp.commandv("playlist-next")
         mp.set_property_bool("pause", false)
-        mp.osd_message("엔딩 스킵")
+        mp.osd_message(t("skip_outro"))
     end
 end
 
--- 엔딩 지점이 있는 파일에서만 time-pos 를 관찰한다 (매 프레임 콜백을 아끼려고).
+-- Watch time-pos only for files that have an outro, to avoid a per-frame callback.
 local function watch(on)
     if on == watching then return end
     watching = on
@@ -37,18 +38,19 @@ end
 
 local function mark(kind)
     local path = mp.get_property("path")
-    local t = mp.get_property_number("time-pos")
-    if not path or not t then return end
+    local pos = mp.get_property_number("time-pos")
+    if not path or not pos then return end
     local s = state.skip_of(path) or {}
     if kind == "intro" then
-        s.intro = t
+        s.intro = pos
     else
-        s.outro = t
+        s.outro = pos
     end
     state.set_skip(path, s.intro, s.outro)
     watch((s.outro or 0) > 0)
     done = false
-    mp.osd_message((kind == "intro" and "오프닝 끝: " or "엔딩 시작: ") .. util.fmt_time(t))
+    mp.osd_message(kind == "intro" and t("intro_marked", util.fmt_time(pos))
+        or t("outro_marked", util.fmt_time(pos)))
 end
 
 function M.init()
@@ -63,7 +65,7 @@ function M.init()
         local path = mp.get_property("path")
         if path then state.set_skip(path, 0, 0) end
         watch(false)
-        mp.osd_message("스킵 구간을 지웠습니다")
+        mp.osd_message(t("skip_cleared"))
     end
     mp.add_key_binding(nil, "clear-skip", clear)
     mp.register_script_message("boda-clear-skip", clear)
@@ -73,12 +75,12 @@ function M.init()
         local s = state.skip_of(mp.get_property("path"))
         watch(s ~= nil and (s.outro or 0) > 0)
         if not s or (s.intro or 0) <= 1 then return end
-        -- 이어보기 위치를 덮어쓰지 않도록, 처음부터 시작할 때만 넘긴다.
+        -- Skip only when starting from the beginning, so resume positions survive.
         mp.add_timeout(0.35, function()
-            local t = mp.get_property_number("time-pos") or 0
-            if t < 2 then
+            local now = mp.get_property_number("time-pos") or 0
+            if now < 2 then
                 mp.commandv("seek", s.intro, "absolute")
-                mp.osd_message("오프닝 스킵")
+                mp.osd_message(t("skip_intro"))
             end
         end)
     end)

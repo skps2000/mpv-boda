@@ -1,8 +1,10 @@
--- 키로 부르는 동작들. 모든 동작은 script-binding 과 script-message 양쪽으로 열어둔다.
--- (기본 키는 input.conf 에만 있고, 스크립트가 키를 강제로 가져가지 않는다.)
+-- Actions that keys can call. Each one is exposed both as a script-binding and
+-- as a script-message. Default keys live in input.conf only, so the script never
+-- grabs a key by itself.
 local mp = require("mp")
 local util = require("lib.util")
 local state = require("lib.state")
+local t = require("lib.i18n").t
 
 local M = {}
 
@@ -15,18 +17,19 @@ local function action(name, fn, flags)
     mp.register_script_message("boda-" .. name, fn)
 end
 
--- ── 속도 ────────────────────────────────────────────────────────────
+-- ── speed ───────────────────────────────────────────────────────────
 local last_speed = 1.0
 
 local function set_speed(v)
     v = util.clamp(v, 0.1, 8)
     mp.set_property_number("speed", v)
-    osd(string.format("속도 %.2fx", v))
+    osd(t("speed", v))
 end
 
--- ── 필터 ────────────────────────────────────────────────────────────
--- 상태를 Lua 변수로 들고 있으면 실제 필터 목록과 어긋난다. mpv 에 toggle 을 맡기고
--- 결과를 다시 읽어서 알린다. (실패하면 "켜짐"이라고 거짓말하지 않는다)
+-- ── filters ─────────────────────────────────────────────────────────
+-- Keeping on/off state in a Lua variable drifts from the real filter list.
+-- Let mpv toggle it and read the list back, so a filter that failed to load is
+-- never reported as "on".
 local function toggle_filter(kind, label, filter, on_text, off_text)
     mp.commandv(kind, "toggle", "@" .. label .. ":" .. filter)
     local list = mp.get_property(kind) or ""
@@ -43,12 +46,12 @@ local function af_action(name, label, filter, on_text, off_text)
     action(name, function() toggle_filter("af", label, filter, on_text, off_text) end)
 end
 
--- ── 색보정 ──────────────────────────────────────────────────────────
+-- ── colour ──────────────────────────────────────────────────────────
 local EQ = { "brightness", "contrast", "saturation", "gamma", "hue" }
 local saved_eq, eq_off = nil, false
 
 local function eq_text()
-    return string.format("밝기 %d  대비 %d  채도 %d  감마 %d  색상 %d",
+    return t("eq_values",
         mp.get_property_number("brightness") or 0,
         mp.get_property_number("contrast") or 0,
         mp.get_property_number("saturation") or 0,
@@ -60,15 +63,15 @@ local function recommend()
     local transfer = tostring(mp.get_property("video-params/gamma") or "")
     local peak = mp.get_property_number("video-params/sig-peak") or 0
     if transfer:find("pq") or transfer:find("hlg") or peak > 1.2 then
-        return nil, "HDR 원본 유지"
+        return nil, t("auto_hdr")
     end
     local h = mp.get_property_number("video-params/h") or 0
     if h >= 1440 then
-        return { brightness = 0, contrast = 2, saturation = 2, gamma = 0 }, "고해상도"
+        return { brightness = 0, contrast = 2, saturation = 2, gamma = 0 }, t("auto_high")
     elseif h >= 1000 then
-        return { brightness = 1, contrast = 3, saturation = 3, gamma = 0 }, "FHD"
+        return { brightness = 1, contrast = 3, saturation = 3, gamma = 0 }, t("auto_fhd")
     elseif h > 0 then
-        return { brightness = 2, contrast = 5, saturation = 4, gamma = -1 }, "저해상도 보정"
+        return { brightness = 2, contrast = 5, saturation = 4, gamma = -1 }, t("auto_low")
     end
     return nil, nil
 end
@@ -77,20 +80,20 @@ local function apply_auto_color(quiet)
     if not state.prefs.auto_color then return end
     local eq, name = recommend()
     if not eq then
-        if name and not quiet then osd("자동 보정: " .. name, 1.0) end
+        if name and not quiet then osd(t("auto_applied", name), 1.0) end
         return
     end
     for k, v in pairs(eq) do mp.set_property_number(k, v) end
-    if not quiet then osd("자동 보정: " .. name, 1.0) end
+    if not quiet then osd(t("auto_applied", name), 1.0) end
 end
 
--- ── 창 ──────────────────────────────────────────────────────────────
+-- ── window ──────────────────────────────────────────────────────────
 local WIN_SCALES = { 0.5, 1, 1.5, 2 }
 local pip_saved = nil
 local boss_hidden = false
 
 function M.init()
-    -- 속도
+    -- speed
     action("speed-up", function()
         local s = mp.get_property_number("speed") or 1
         if math.abs(s - 1) > 0.01 then last_speed = s end
@@ -112,14 +115,14 @@ function M.init()
     end)
     action("speed-reset", function() set_speed(1) end)
 
-    -- A-B 반복
+    -- A-B loop
     local function show_ab()
         local function fmt(v)
-            if not v or v == "no" then return "―" end
+            if not v or v == "no" then return "—" end
             return util.fmt_time(tonumber(v))
         end
-        osd(string.format("A-B  A %s   B %s",
-            fmt(mp.get_property("ab-loop-a")), fmt(mp.get_property("ab-loop-b"))))
+        osd(t("ab_points", fmt(mp.get_property("ab-loop-a")),
+            fmt(mp.get_property("ab-loop-b"))))
     end
     action("ab-a", function()
         mp.set_property_number("ab-loop-a", mp.get_property_number("time-pos") or 0)
@@ -140,16 +143,16 @@ function M.init()
     action("ab-clear", function()
         mp.set_property("ab-loop-a", "no")
         mp.set_property("ab-loop-b", "no")
-        osd("A-B 반복 해제")
+        osd(t("ab_cleared"))
     end)
     action("ab-toggle", function()
         local a, b = mp.get_property("ab-loop-a"), mp.get_property("ab-loop-b")
         if a ~= "no" or b ~= "no" then
             mp.set_property("ab-loop-a", "no")
             mp.set_property("ab-loop-b", "no")
-            osd("A-B 반복 해제")
+            osd(t("ab_cleared"))
         else
-            osd("A-B 지점이 없습니다. [ 와 ] 로 지정하세요")
+            osd(t("ab_none"))
         end
     end)
     local function nudge(which, delta)
@@ -167,30 +170,30 @@ function M.init()
         nudge("ab-loop-b", d)
     end)
 
-    -- 북마크
+    -- bookmarks
     action("bookmark-add", function()
         local path = mp.get_property("path")
-        local t = mp.get_property_number("time-pos")
-        if not path or not t then return end
+        local pos = mp.get_property_number("time-pos")
+        if not path or not pos then return end
         local list = {}
         for i, v in ipairs(state.bookmarks_of(path)) do list[i] = v end
-        list[#list + 1] = t
+        list[#list + 1] = pos
         table.sort(list)
         state.set_bookmarks(path, list)
-        osd(string.format("북마크 %d개  ·  %s", #list, util.fmt_time(t)))
+        osd(t("bookmark_added", #list, util.fmt_time(pos)))
     end)
     local function jump_bookmark(dir)
         local path = mp.get_property("path")
-        local t = mp.get_property_number("time-pos") or 0
+        local pos = mp.get_property_number("time-pos") or 0
         local best = nil
         for _, b in ipairs(state.bookmarks_of(path)) do
-            if (dir > 0 and b > t + 0.4) or (dir < 0 and b < t - 0.4) then
-                if not best or math.abs(b - t) < math.abs(best - t) then best = b end
+            if (dir > 0 and b > pos + 0.4) or (dir < 0 and b < pos - 0.4) then
+                if not best or math.abs(b - pos) < math.abs(best - pos) then best = b end
             end
         end
         if best then
             mp.commandv("seek", best, "absolute")
-            osd("북마크 " .. util.fmt_time(best))
+            osd(t("bookmark_at", util.fmt_time(best)))
         else
             mp.commandv("add", "chapter", dir)
         end
@@ -200,10 +203,10 @@ function M.init()
     action("bookmark-clear", function()
         local path = mp.get_property("path")
         if path then state.set_bookmarks(path, {}) end
-        osd("북마크를 지웠습니다")
+        osd(t("bookmarks_cleared"))
     end)
 
-    -- 즐겨찾기 구간
+    -- saved clips
     action("favorite-add", function()
         local path = mp.get_property("path")
         if not path then return end
@@ -213,14 +216,13 @@ function M.init()
         if b and b < a then a, b = b, a end
         local list = {}
         for i, v in ipairs(state.favorites_of(path)) do list[i] = v end
-        list[#list + 1] = { a = a, b = b, name = "구간 " .. (#list + 1) }
+        list[#list + 1] = { a = a, b = b, name = t("clip_n", #list + 1) }
         state.set_favorites(path, list)
         mp.commandv("script-message", "boda-refresh")
         if b then
-            osd(string.format("즐겨찾기 추가  %s ~ %s", util.fmt_time(a), util.fmt_time(b)))
+            osd(t("fav_added_range", util.fmt_time(a), util.fmt_time(b)))
         else
-            osd(string.format("즐겨찾기 추가  %s  ([ ] 로 구간을 정하면 구간으로 저장됩니다)",
-                util.fmt_time(a)), 2)
+            osd(t("fav_added_point", util.fmt_time(a)))
         end
     end)
     action("favorite-clear", function()
@@ -228,7 +230,7 @@ function M.init()
         if not path then return end
         state.set_favorites(path, {})
         mp.commandv("script-message", "boda-refresh")
-        osd("이 영상의 즐겨찾기를 비웠습니다")
+        osd(t("fav_cleared"))
     end)
 
     local function favorite_at(n)
@@ -238,7 +240,9 @@ function M.init()
     end
     mp.register_script_message("boda-favorite-play", function(n)
         local _, _, f = favorite_at(n)
-        if f then mp.commandv("seek", f.a, "absolute") end
+        if not f then return end
+        mp.commandv("seek", f.a, "absolute")
+        mp.set_property_bool("pause", false)
     end)
     mp.register_script_message("boda-favorite-loop", function(n)
         local _, _, f = favorite_at(n)
@@ -258,30 +262,30 @@ function M.init()
         end
         state.set_favorites(path, out)
         mp.commandv("script-message", "boda-refresh")
-        osd("즐겨찾기에서 지웠습니다")
+        osd(t("fav_removed"))
     end)
 
-    -- 위치 이동
+    -- jumping around
     action("jump-start", function()
         mp.commandv("seek", 0, "absolute")
-        osd("처음으로")
+        osd(t("jump_start"))
     end)
     action("jump-mid", function()
         local d = mp.get_property_number("duration") or 0
         if d > 0 then
             mp.commandv("seek", d / 2, "absolute")
-            osd("중간으로")
+            osd(t("jump_mid"))
         end
     end)
     action("jump-end", function()
         local d = mp.get_property_number("duration") or 0
         if d > 30 then
             mp.commandv("seek", d - 30, "absolute")
-            osd("끝 30초 전")
+            osd(t("jump_end"))
         end
     end)
 
-    -- 색보정
+    -- colour
     action("eq-show", function() osd(eq_text()) end)
     action("eq-toggle", function()
         if not eq_off then
@@ -291,7 +295,7 @@ function M.init()
                 mp.set_property_number(k, 0)
             end
             eq_off = true
-            osd("색보정 끔 (원본)")
+            osd(t("eq_off"))
         else
             for _, k in ipairs(EQ) do
                 mp.set_property_number(k, (saved_eq and saved_eq[k]) or 0)
@@ -304,7 +308,7 @@ function M.init()
         for _, k in ipairs(EQ) do mp.set_property_number(k, 0) end
         state.prefs.auto_color = false
         state.mark("prefs")
-        osd("색보정 초기화")
+        osd(t("eq_reset"))
     end)
     action("auto-color-toggle", function()
         state.prefs.auto_color = not state.prefs.auto_color
@@ -313,7 +317,7 @@ function M.init()
             apply_auto_color()
         else
             for _, k in ipairs(EQ) do mp.set_property_number(k, 0) end
-            osd("자동 보정 끔")
+            osd(t("auto_off"))
         end
     end)
     mp.register_script_message("boda-auto-color", function(mode)
@@ -326,50 +330,66 @@ function M.init()
         end
     end)
 
-    -- 영상 필터
-    vf_action("flip-h", "hflip", "hflip", "좌우 반전", "좌우 반전 해제")
-    vf_action("flip-v", "vflip", "vflip", "상하 반전", "상하 반전 해제")
-    vf_action("blur", "blur", "lavfi=[gblur=sigma=1.2]", "블러 켬", "블러 끔")
-    vf_action("sharpen", "sharp", "lavfi=[unsharp=5:5:0.8]", "샤픈 켬", "샤픈 끔")
-    vf_action("denoise", "dn", "lavfi=[hqdn3d]", "노이즈 감소 켬", "노이즈 감소 끔")
-    -- 예전 pp 필터는 FFmpeg 에서 빠졌다. deblock 으로 대체.
-    vf_action("deblock", "deblock", "lavfi=[deblock=filter=weak:block=4]", "디블록 켬", "디블록 끔")
+    -- video filters
+    vf_action("flip-h", "hflip", "hflip", t("flip_h_on"), t("flip_h_off"))
+    vf_action("flip-v", "vflip", "vflip", t("flip_v_on"), t("flip_v_off"))
+    vf_action("blur", "blur", "lavfi=[gblur=sigma=1.2]", t("blur_on"), t("blur_off"))
+    vf_action("sharpen", "sharp", "lavfi=[unsharp=5:5:0.8]", t("sharpen_on"), t("sharpen_off"))
+    vf_action("denoise", "dn", "lavfi=[hqdn3d]", t("denoise_on"), t("denoise_off"))
+    -- The old pp filter was dropped from FFmpeg; deblock replaces it.
+    vf_action("deblock", "deblock", "lavfi=[deblock=filter=weak:block=4]",
+        t("deblock_on"), t("deblock_off"))
     action("filters-clear", function()
         mp.commandv("vf", "clr", "")
-        osd("영상 필터 모두 해제")
+        osd(t("filters_cleared"))
     end)
 
-    -- 소리 필터 (mpv.conf 의 scaletempo2 를 지우지 않도록 라벨 토글만 쓴다)
-    af_action("audio-norm", "norm", "lavfi=[dynaudnorm]", "음량 평준화 켬", "음량 평준화 끔")
-    af_action("voice-remove", "voice", "lavfi=[stereotools=mlev=0]", "보컬 제거 시도", "보컬 제거 해제")
-    af_action("stereo-swap", "swap", "lavfi=[pan=stereo|c0=c1|c1=c0]", "좌우 채널 교환", "채널 원위치")
+    -- Audio filters: toggle by label so scaletempo2 from mpv.conf survives.
+    af_action("audio-norm", "norm", "lavfi=[dynaudnorm]", t("norm_on"), t("norm_off"))
+    af_action("voice-remove", "voice", "lavfi=[stereotools=mlev=0]",
+        t("voice_on"), t("voice_off"))
+    af_action("stereo-swap", "swap", "lavfi=[pan=stereo|c0=c1|c1=c0]",
+        t("swap_on"), t("swap_off"))
     action("audio-reset", function()
         for _, label in ipairs({ "norm", "voice", "swap" }) do
             mp.commandv("af", "remove", "@" .. label)
         end
         mp.set_property("audio-delay", 0)
-        osd("소리 설정 초기화")
+        osd(t("audio_reset"))
+    end)
+    action("audio-delay-reset", function()
+        mp.set_property("audio-delay", 0)
+        osd(t("audio_delay_reset"))
     end)
 
-    -- 화면
+    -- picture
     action("upscale-toggle", function()
         local sharp = mp.get_property("scale") == "ewa_lanczossharp"
         mp.set_property("scale", sharp and "bilinear" or "ewa_lanczossharp")
         mp.set_property("deband", sharp and "no" or "yes")
-        osd(sharp and "업스케일 끔" or "선명 업스케일 켬")
+        osd(sharp and t("upscale_off") or t("upscale_on"))
+    end)
+    action("sub-pos-reset", function()
+        mp.set_property("sub-pos", 100)
+        mp.set_property("sub-scale", 1)
+        osd(t("sub_pos_reset"))
+    end)
+    action("sub-delay-reset", function()
+        mp.set_property("sub-delay", 0)
+        osd(t("sub_delay_reset"))
     end)
     action("dual-sub", function()
         mp.command("cycle secondary-sid")
-        osd("듀얼 자막: 주 " .. tostring(mp.get_property("sid")) ..
-            "  ·  부 " .. tostring(mp.get_property("secondary-sid")))
+        osd(t("dual_sub", tostring(mp.get_property("sid")),
+            tostring(mp.get_property("secondary-sid"))))
     end)
     action("rotate", function()
         local r = ((mp.get_property_number("video-rotate") or 0) + 90) % 360
         mp.set_property_number("video-rotate", r)
-        osd("회전 " .. r .. "°")
+        osd(t("rotate", r))
     end)
 
-    -- 창
+    -- window
     action("window-cycle", function()
         if mp.get_property_bool("fullscreen") then mp.set_property_bool("fullscreen", false) end
         local cur = mp.get_property_number("window-scale") or 1
@@ -381,24 +401,31 @@ function M.init()
             end
         end
         mp.set_property_number("window-scale", nxt)
-        osd(string.format("창 크기 %.1fx", nxt))
+        osd(t("window_scale", string.format("%.1f", nxt)))
+    end)
+    action("window-reset", function()
+        mp.set_property_number("window-scale", 1)
+        for _, prop in ipairs({ "video-zoom", "video-pan-x", "video-pan-y" }) do
+            mp.set_property_number(prop, 0)
+        end
+        osd(t("window_original"))
     end)
     action("window-max", function()
         local maxed = mp.get_property_bool("window-maximized")
         mp.set_property_bool("window-maximized", not maxed)
-        osd(maxed and "창 복원" or "창 최대화")
+        osd(maxed and t("window_restore") or t("window_max"))
     end)
     mp.register_script_message("boda-window-scale", function(v)
         mp.set_property_bool("fullscreen", false)
         mp.set_property_number("window-scale", tonumber(v) or 1)
-        osd(string.format("창 크기 %sx", tostring(v)))
+        osd(t("window_scale", tostring(v)))
     end)
     action("pip", function()
         if pip_saved then
             mp.set_property_bool("ontop", pip_saved.ontop)
             mp.set_property_number("window-scale", pip_saved.scale)
             pip_saved = nil
-            osd("PiP 끔")
+            osd(t("pip_off"))
         else
             pip_saved = {
                 ontop = mp.get_property_bool("ontop") or false,
@@ -407,7 +434,7 @@ function M.init()
             mp.set_property_bool("fullscreen", false)
             mp.set_property_bool("ontop", true)
             mp.set_property_number("window-scale", 0.38)
-            osd("PiP 켬")
+            osd(t("pip_on"))
         end
     end)
     action("boss", function()
@@ -421,7 +448,7 @@ function M.init()
         end
     end)
 
-    -- 캡처 / 녹화
+    -- capture and recording
     action("shot-clipboard", function()
         local dir = state.dir or os.getenv("TEMP") or "."
         local file = dir .. "/clipboard.png"
@@ -434,34 +461,33 @@ function M.init()
             playback_only = false,
             args = { "powershell", "-NoProfile", "-STA", "-WindowStyle", "Hidden", "-Command", script },
         }, function(ok, res)
-            osd((ok and res and res.status == 0) and "화면을 클립보드에 복사했습니다"
-                or "클립보드 복사 실패")
+            osd((ok and res and res.status == 0) and t("clip_copied") or t("clip_copy_failed"))
         end)
     end)
     action("record", function()
         if (mp.get_property("stream-record") or "") ~= "" then
             mp.set_property("stream-record", "")
-            osd("녹화 중지")
+            osd(t("record_stop"))
             return
         end
         local dest = mp.command_native({ "expand-path", "~~desktop/" }) ..
             "record-" .. os.date("%Y%m%d-%H%M%S") .. ".mkv"
         mp.set_property("stream-record", dest)
-        osd("녹화 시작\n" .. dest, 2.5)
+        osd(t("record_start", dest), 2.5)
     end)
 
-    -- 재생목록 저장/불러오기
+    -- playlist files
     action("save-m3u", function()
         local list = mp.get_property_native("playlist") or {}
         if #list == 0 then
-            osd("재생목록이 비어 있습니다")
+            osd(t("m3u_empty"))
             return
         end
         local path = mp.command_native({ "expand-path", "~~desktop/" }) ..
             "playlist-" .. os.date("%Y%m%d-%H%M%S") .. ".m3u8"
         local f = io.open(path, "wb")
         if not f then
-            osd("저장 실패")
+            osd(t("m3u_failed"))
             return
         end
         f:write("#EXTM3U\n")
@@ -469,10 +495,10 @@ function M.init()
             f:write(e.filename, "\n")
         end
         f:close()
-        osd("재생목록 저장\n" .. path, 2.5)
+        osd(t("m3u_saved", path), 2.5)
     end)
 
-    -- 기타
+    -- misc
     action("stop", function() mp.command("stop") end)
     action("reopen", function()
         local path = mp.get_property("path")
@@ -480,7 +506,7 @@ function M.init()
     end)
     action("reload-sub", function()
         mp.command("rescan-external-files")
-        osd("자막을 다시 찾았습니다")
+        osd(t("sub_rescan"))
     end)
     action("open-config", function()
         mp.command_native_async({
@@ -491,11 +517,11 @@ function M.init()
         }, function() end)
     end)
     action("about", function()
-        osd((mp.get_property("mpv-version") or "mpv") ..
-            "\nboda · 팟플레이어 스타일 단축키\n설정: " .. (state.dir or ""), 4)
+        osd(t("about", mp.get_property("mpv-version") or "mpv", state.dir or ""), 4)
     end)
+    -- input.conf passes an i18n key (na_dvd, ...); anything else is shown as it is
     mp.register_script_message("boda-na", function(what)
-        osd((what or "이 기능") .. "은(는) mpv에 없습니다")
+        osd(t("not_available", t(what or "?")))
     end)
 
     mp.register_event("file-loaded", function()

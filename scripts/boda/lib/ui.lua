@@ -1,24 +1,24 @@
--- 화면에 그리는 레이어와 마우스 입력을 한 곳에서 관리한다.
--- 예전 구조는 두 스크립트가 MBTN_LEFT 를 동시에 강제로 붙잡아서, 나중에 켜진 쪽이
--- 클릭을 전부 먹어버렸다. 이제 입력 창구는 여기 하나뿐이다.
+-- One place that owns every drawing layer and all mouse input.
+-- The old setup had two scripts force-binding MBTN_LEFT at the same time, so
+-- whichever armed last swallowed every click. Now there is a single entry point.
 local mp = require("mp")
 local util = require("lib.util")
 local opts = require("lib.options")
 
 local M = {}
 
-local layers = {}     -- z 내림차순 (히트 테스트 순서)
+local layers = {}     -- sorted by z, highest first (hit test order)
 local mouse_subs = {}
 local hover_id = nil
 local drag = nil
 local press_region = nil
 local cursor_saved = nil
 local cursor_held = false
-local drag_allowed = nil -- 사용자가 설정한 window-dragging 값
+local drag_allowed = nil -- the user's own window-dragging setting
 local drag_now = nil
 
--- ── 색 ──────────────────────────────────────────────────────────────
-local function to_ass(rgb) -- #RRGGBB → ASS 의 BBGGRR
+-- ── colours ───────────────────────────────────────────────────────
+local function to_ass(rgb) -- #RRGGBB → BBGGRR, the order ASS wants
     rgb = tostring(rgb or ""):gsub("#", "")
     if #rgb ~= 6 or rgb:match("%X") then rgb = "FF0000" end
     return rgb:sub(5, 6) .. rgb:sub(3, 4) .. rgb:sub(1, 2)
@@ -26,7 +26,7 @@ end
 
 M.theme = {}
 
--- 목록 패널이 차지한 오른쪽 폭. 탐색바가 영상 영역에만 걸치도록 쓴다.
+-- How much width the side panel takes, so the seek bar can stay over the video.
 M.reserved_right = 0
 
 local function build_theme()
@@ -43,13 +43,13 @@ local function build_theme()
     }
 end
 
--- ── 크기 ────────────────────────────────────────────────────────────
+-- ── sizing ────────────────────────────────────────────────────────
 function M.osd_size()
     return mp.get_property_number("osd-width") or 0, mp.get_property_number("osd-height") or 0
 end
 
--- 창이 작아도 읽을 수 있게 배율은 완만하게만 줄인다. 남는 공간에 몇 줄이
--- 들어가는지는 각 화면이 직접 계산한다.
+-- Shrink gently so text stays readable in a small window; how many rows fit
+-- is worked out by each screen itself.
 function M.scale()
     if opts.scale and opts.scale > 0 then return opts.scale end
     local _, h = M.osd_size()
@@ -62,7 +62,7 @@ function M.ready()
     return w >= 120 and h >= 90
 end
 
--- ── 레이어 ──────────────────────────────────────────────────────────
+-- ── layers ────────────────────────────────────────────────────────
 local Layer = {}
 Layer.__index = Layer
 
@@ -99,7 +99,7 @@ function Layer:rect(x, y, w, h, color, opacity)
         x, y, color, 255 - (opacity or 255), w, w, h, h))
 end
 
--- ASS 드로잉으로 아이콘을 그린다 (이모지 글꼴에 의존하지 않도록).
+-- Draw an icon with ASS shapes (no emoji font needed).
 function Layer:draw(x, y, color, opacity, path)
     self:add(string.format("{\\an7\\pos(%.0f,%.0f)\\bord0\\shad0\\p1\\1c&H%s&\\1a&H%02X&}%s{\\p0}",
         x, y, color, 255 - (opacity or 255), path))
@@ -111,7 +111,7 @@ function Layer:text(x, y, size, color, align, s, opacity)
         align or 7, x, y, opts.font, size, color, 255 - (opacity or 255), util.esc(s)))
 end
 
--- 폭에 맞춰 잘라서 그린다. 반환값은 실제로 그린 문자열.
+-- Draw text cut to fit; returns what was actually drawn.
 function Layer:text_fit(x, y, size, color, align, s, max_w, opacity)
     local cut = util.truncate(s, size, max_w)
     self:text(x, y, size, color, align, cut, opacity)
@@ -147,9 +147,9 @@ function Layer:hide()
     end
 end
 
--- ── 히트 테스트 ─────────────────────────────────────────────────────
--- want 을 주면 그 동작을 가진 영역 중 가장 위쪽 것을 찾는다.
--- (예: 목록 행 위에서 휠을 굴려도 패널 스크롤이 잡히도록)
+-- ── hit testing ───────────────────────────────────────────────────
+-- With `want`, return the topmost region that has that handler
+-- (so the wheel still scrolls the panel while hovering a row).
 local function region_at(x, y, want)
     if not x then return nil end
     for _, l in ipairs(layers) do
@@ -177,18 +177,30 @@ function M.mouse_pos()
     return m.x, m.y, m.hover
 end
 
--- 한 군데의 오류가 스크립트 전체를 죽이지 않도록 감싼다.
+-- Wrap a callback so one bad frame does not take the whole script down.
+-- One bad draw must not take the whole script down, so errors are swallowed.
+-- They are also counted and published, so the tests can fail on them instead of
+-- a screen quietly going blank.
+local errors = { count = 0, last = "" }
+
+function M.failed(where, err)
+    errors.count = errors.count + 1
+    errors.last = where .. ": " .. tostring(err)
+    mp.msg.error(errors.last)
+    mp.set_property_native("user-data/boda/errors", errors)
+end
+
 function M.guard(name, fn)
     return function(...)
         local ok, err = pcall(fn, ...)
-        if not ok then mp.msg.error(name .. ": " .. tostring(err)) end
+        if not ok then M.failed(name, err) end
     end
 end
 
 local function redraw(layer)
     if layer and layer.redraw then
         local ok, err = pcall(layer.redraw)
-        if not ok then mp.msg.error(layer.name .. " 그리기 실패: " .. tostring(err)) end
+        if not ok then M.failed(layer.name .. " draw failed", err) end
     end
 end
 
@@ -206,34 +218,34 @@ local function set_hover(id, layer)
     if layer and layer ~= prev_layer then redraw(layer) end
 end
 
--- ── 창 끌기 ─────────────────────────────────────────────────────────
--- mpv 는 영상 위에서 왼쪽 버튼을 누르면 창을 움직인다(--window-dragging).
--- UI 위에서는 이걸 꺼야 패널 너비 조절이나 슬라이더 끌기가 창 이동으로 새지 않는다.
+-- ── window dragging ───────────────────────────────────────────────
+-- mpv moves the window when you press the left button over the video
+-- (--window-dragging), so it has to be off over the UI or panel resizing and
 local function set_window_dragging(allow)
     if drag_allowed == nil then
         drag_allowed = mp.get_property_bool("window-dragging")
         if drag_allowed == nil then drag_allowed = true end
     end
-    if not drag_allowed then return end -- 사용자가 꺼둔 경우엔 건드리지 않는다
+    if not drag_allowed then return end -- leave it alone if the user turned it off
     local want = allow and true or false
     if want == drag_now then return end
     drag_now = want
     mp.set_property_bool("window-dragging", want)
 end
 
--- 지금 커서 위치를 기준으로 다시 판단한다 (패널이 열리거나 다시 그려진 뒤).
+-- Re-check against the cursor position (after the panel opens or redraws).
 function M.update_dragging()
     local x, y = M.mouse_pos()
     set_window_dragging(not (drag or (x and region_at(x, y))))
 end
 
--- ── 입력 ────────────────────────────────────────────────────────────
+-- ── input ─────────────────────────────────────────────────────────
 function M.on_mouse(fn)
     mouse_subs[#mouse_subs + 1] = fn
 end
 
 function M.click(event)
-    -- 누름/뗌 정보가 없는 방식으로 불린 경우(예: script-message)는 한 번의 클릭으로 본다.
+    -- Called without up/down information (a script-message, say): treat it as one click.
     if event ~= "down" and event ~= "up" then
         M.click("down")
         M.click("up")
@@ -264,14 +276,14 @@ function M.click(event)
                 return
             end
         end
-        -- 누른 곳과 뗀 곳이 같을 때만 클릭으로 친다.
+        -- Only count it as a click when press and release land on the same region.
         local r = region_at(x, y)
         if r and r.click and (not pressed or pressed.id == r.id) then r.click(x, y) end
         M.update_dragging()
     end
 end
 
--- 더블클릭도 여기서 받는다. UI 위가 아니면 원래 동작(재생/일시정지)으로 넘긴다.
+-- Double clicks come here too; outside the UI they fall through to play/pause.
 function M.double_click()
     local x, y = M.mouse_pos()
     local r = region_at(x, y)
@@ -282,22 +294,22 @@ function M.double_click()
     return r ~= nil
 end
 
-local update_hover -- 아래 init 에서 채운다
+local update_hover -- filled in by init below
 
 function M.wheel(dir)
     local x, y = M.mouse_pos()
     local r = region_at(x, y, "scroll")
     if r then
         r.scroll(dir)
-        -- 목록이 밀렸으니 커서 아래 항목이 바뀐다. 강조 표시를 다시 계산한다.
+        -- The list moved under the cursor, so work out the highlight again.
         if update_hover then update_hover(x, y, true) end
         return true
     end
     return false
 end
 
--- ── 커서 ────────────────────────────────────────────────────────────
--- 패널이 열려 있는 동안에는 커서를 숨기지 않는다.
+-- ── cursor ────────────────────────────────────────────────────────
+-- Keep the cursor visible while a panel is open.
 function M.hold_cursor(hold)
     if hold == cursor_held then return end
     cursor_held = hold
@@ -342,11 +354,11 @@ function M.init()
         update_hover(x, y, m.hover)
         for _, fn in ipairs(mouse_subs) do
             local ok, err = pcall(fn, x, y, m.hover)
-            if not ok then mp.msg.error("마우스 처리 실패: " .. tostring(err)) end
+            if not ok then mp.msg.error("mouse handler failed: " .. tostring(err)) end
         end
     end)
 
-    -- 창 크기가 바뀌면 모든 레이어를 다시 그린다.
+    -- Redraw every layer when the window size changes.
     local function on_resize()
         for _, l in ipairs(layers) do
             if l.shown then redraw(l) end

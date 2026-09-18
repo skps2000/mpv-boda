@@ -1,5 +1,6 @@
-# 화이트리스트 방식: 기본은 전부 제외하고, 공개할 파일만 다시 포함한다.
-# mpv 설정 폴더에는 시청 기록 같은 개인 파일이 함께 쌓이므로 블랙리스트는 위험하다.
+# Whitelist: everything is excluded, then the files meant to be public are let
+# back in. An mpv config folder fills up with private files like the watch
+# history, so a blacklist here would be one forgotten rule away from leaking.
 *
 !*/
 
@@ -15,8 +16,9 @@
 !docs/images/*.png
 !.github/workflows/*.yml
 
-# 안전장치: 아래 규칙이 위 허용보다 우선한다 (개인 기록은 어떤 경우에도 커밋 금지).
-# 설정 폴더 바로 아래만 막는다. 앞의 / 를 빼면 scripts/boda/mod/history.lua 까지 걸린다.
+# Backstop: these win over the rules above, so private files can never be
+# committed. They are anchored to the config folder itself -- without the
+# leading / they would also swallow scripts/boda/mod/history.lua.
 /history.*
 /bookmarks.*
 /recent-folders.*

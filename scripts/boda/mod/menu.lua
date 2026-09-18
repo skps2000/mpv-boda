@@ -1,21 +1,22 @@
--- 우클릭 메뉴.
+-- Context menu.
 --
--- mpv 0.41 은 menu-data 속성에 메뉴 트리를 넣고 context-menu 명령을 부르면
--- 윈도우 기본 메뉴로 띄워준다. 하위 메뉴·체크 표시·단축키 표기·키보드 이동이
--- 전부 따라오므로 직접 그리지 않는다.
--- 그 기능이 없는 환경에서는 mp.input.select 로 같은 트리를 단계별로 보여준다.
+-- mpv 0.41 shows a native window menu when you put a tree in the menu-data
+-- property and call the context-menu command. Submenus, check marks, shortcut
+-- labels and keyboard navigation all come for free, so nothing is drawn here.
+-- Where that is missing, the same tree is walked with mp.input.select instead.
 local mp = require("mp")
 local util = require("lib.util")
 local ui = require("lib.ui")
 local opts = require("lib.options")
 local state = require("lib.state")
+local t = require("lib.i18n").t
 
 local M = {}
 
 local has_input, input = pcall(require, "mp.input")
-local native_ok = nil -- nil = 아직 모름
+local native_ok = nil -- nil = not known yet
 
--- ── 트리 만들기 도우미 ──────────────────────────────────────────────
+-- ── tree helpers ──────────────────────────────────────────────────
 local SEP = { type = "separator" }
 
 local function item(title, cmd, o)
@@ -29,7 +30,7 @@ end
 local function submenu(title, items, o)
     o = o or {}
     if #items == 0 then
-        items = { item("(없음)", "", { disabled = true }) }
+        items = { item(t("menu_none"), "", { disabled = true }) }
         o.disabled = true
     end
     return {
@@ -56,18 +57,18 @@ local function near(a, b)
     return a and b and math.abs(a - b) < 0.01
 end
 
--- ── 조각들 ──────────────────────────────────────────────────────────
+-- ── pieces ────────────────────────────────────────────────────────
 local function tracks_of(kind, prop)
     local items = {}
     local cur = mp.get_property(prop)
     if kind == "sub" then
-        items[#items + 1] = item("끄기", "set sid no", { checked = cur == "no" })
+        items[#items + 1] = item(t("sub_off"), "set sid no", { checked = cur == "no" })
     end
     for _, tr in ipairs(mp.get_property_native("track-list") or {}) do
         if tr.type == kind then
-            local label = tr.title or tr.codec or ("트랙 " .. tostring(tr.id))
+            local label = tr.title or tr.codec or t("track_n", tostring(tr.id))
             if tr.lang then label = "[" .. tr.lang .. "] " .. label end
-            if tr.external then label = label .. "  (외부)" end
+            if tr.external then label = label .. "  (" .. t("track_external") .. ")" end
             items[#items + 1] = item(label, "set " .. prop .. " " .. tostring(tr.id),
                 { checked = tr.selected })
         end
@@ -106,7 +107,7 @@ local function history_items()
     return items
 end
 
--- 재생목록은 길 수 있으니 현재 위치 주변만 보여준다.
+-- A playlist can be long, so only show what is around the current entry.
 local function playlist_items()
     local pl = mp.get_property_native("playlist") or {}
     local cur = (mp.get_property_number("playlist-pos") or 0) + 1
@@ -119,7 +120,7 @@ local function playlist_items()
             "playlist-play-index " .. (i - 1), { checked = e.current })
     end
     if #pl > last then
-        items[#items + 1] = item(string.format("… 그 밖에 %d개 (F6 으로 목록 열기)", #pl - last),
+        items[#items + 1] = item(t("menu_more_items", #pl - last),
             bind("panel-pl"))
     end
     return items
@@ -127,13 +128,13 @@ end
 
 local function sort_items()
     local defs = {
-        { "none", "기본 순서" }, { "name", "이름" }, { "size", "크기" },
-        { "quality", "화질" }, { "duration", "길이" }, { "mtime", "날짜" },
+        { "none", "sort_none" }, { "name", "sort_name" }, { "size", "sort_size" },
+        { "quality", "sort_quality" }, { "duration", "sort_duration" }, { "mtime", "sort_mtime" },
     }
     local items = {}
     for _, d in ipairs(defs) do
         local on = state.prefs.sort == d[1]
-        local label = d[2]
+        local label = t(d[2])
         if on and d[1] ~= "none" then
             label = label .. (state.prefs.sort_desc and "  ↓" or "  ↑")
         end
@@ -146,16 +147,16 @@ local function favorite_items()
     local path = mp.get_property("path")
     local items = {}
     for i, f in ipairs(state.favorites_of(path)) do
-        local label = f.name or ("구간 " .. i)
+        local label = f.name or t("clip_n", i)
         if f.b then
             label = string.format("%s  (%s ~ %s)", label, util.fmt_time(f.a), util.fmt_time(f.b))
         else
             label = string.format("%s  (%s)", label, util.fmt_time(f.a))
         end
         items[#items + 1] = submenu(label, {
-            item("이 지점으로", message("favorite-play", i)),
-            item("구간 반복", message("favorite-loop", i), { disabled = not f.b }),
-            item("삭제", message("favorite-remove", i)),
+            item(t("menu_clip_goto"), message("favorite-play", i)),
+            item(t("menu_clip_loop"), message("favorite-loop", i), { disabled = not f.b }),
+            item(t("menu_clip_delete"), message("favorite-remove", i)),
         })
         if i >= 20 then break end
     end
@@ -166,7 +167,7 @@ local function chapter_items()
     local items = {}
     local cur = mp.get_property_number("chapter") or -1
     for i, ch in ipairs(mp.get_property_native("chapter-list") or {}) do
-        items[#items + 1] = item(ch.title or ("챕터 " .. i), "set chapter " .. (i - 1),
+        items[#items + 1] = item(ch.title or t("chapter_n", i), "set chapter " .. (i - 1),
             { checked = (i - 1) == cur })
         if i >= 30 then break end
     end
@@ -175,7 +176,7 @@ local function chapter_items()
     if #marks > 0 then
         items[#items + 1] = SEP
         for i, sec in ipairs(marks) do
-            items[#items + 1] = item(string.format("북마크 %d  (%s)", i, util.fmt_time(sec)),
+            items[#items + 1] = item(t("bookmark_n", i) .. "  (" .. util.fmt_time(sec) .. ")",
                 "seek " .. string.format("%.3f", sec) .. " absolute")
             if i >= 20 then break end
         end
@@ -191,9 +192,9 @@ local function speed_items()
             { checked = near(cur, v) })
     end
     items[#items + 1] = SEP
-    items[#items + 1] = item("느리게", bind("speed-down"), { key = "X" })
-    items[#items + 1] = item("빠르게", bind("speed-up"), { key = "C" })
-    items[#items + 1] = item("되돌리기", bind("speed-toggle"), { key = "Z" })
+    items[#items + 1] = item(t("menu_slower"), bind("speed-down"), { key = "X" })
+    items[#items + 1] = item(t("menu_faster"), bind("speed-up"), { key = "C" })
+    items[#items + 1] = item(t("menu_speed_toggle"), bind("speed-toggle"), { key = "Z" })
     return items
 end
 
@@ -207,7 +208,7 @@ end
 
 local function aspect_items()
     local cur = mp.get_property("video-aspect-override") or "-1"
-    local defs = { { "-1", "원본" }, { "16:9", "16:9" }, { "4:3", "4:3" },
+    local defs = { { "-1", t("menu_aspect_default") }, { "16:9", "16:9" }, { "4:3", "4:3" },
         { "2.35:1", "2.35:1" }, { "1.85:1", "1.85:1" } }
     local items = {}
     for _, d in ipairs(defs) do
@@ -217,218 +218,218 @@ local function aspect_items()
     return items
 end
 
--- ── 구역별 묶음 ─────────────────────────────────────────────────────
+-- ── sections ──────────────────────────────────────────────────────
 local sections = {}
 
 sections.open = function(out)
-    out[#out + 1] = submenu("열기", {
-        item("파일…", bind("open-file"), { key = "F3" }),
-        item("폴더…", bind("open-folder"), { key = "F2" }),
-        item("URL / 경로 입력…", bind("open-url"), { key = "Ctrl+U" }),
-        item("클립보드 주소 열기", bind("open-clipboard"), { key = "Ctrl+V" }),
+    out[#out + 1] = submenu(t("menu_open"), {
+        item(t("menu_open_file"), bind("open-file"), { key = "F3" }),
+        item(t("menu_open_folder"), bind("open-folder"), { key = "F2" }),
+        item(t("menu_open_url"), bind("open-url"), { key = "Ctrl+U" }),
+        item(t("menu_open_clipboard"), bind("open-clipboard"), { key = "Ctrl+V" }),
         SEP,
-        submenu("최근 폴더", recent_folders()),
-        item("지금 파일 다시 열기", bind("reopen"), { key = "Ctrl+Y", disabled = not has_file() }),
+        submenu(t("menu_recent_folders"), recent_folders()),
+        item(t("menu_reopen"), bind("reopen"), { key = "Ctrl+Y", disabled = not has_file() }),
     })
 end
 
 sections.resume = function(out)
-    out[#out + 1] = submenu("이어서 보기", history_items())
+    out[#out + 1] = submenu(t("menu_resume"), history_items())
 end
 
 sections.playlist = function(out)
-    out[#out + 1] = submenu("재생목록", {
-        submenu("항목", playlist_items()),
-        submenu("정렬", sort_items()),
+    out[#out + 1] = submenu(t("menu_playlist"), {
+        submenu(t("menu_items"), playlist_items()),
+        submenu(t("menu_sort"), sort_items()),
         SEP,
-        item("목록 패널 열기", bind("panel-pl"), { key = "F6" }),
-        item("재생목록 저장", bind("save-m3u"), { key = "Ctrl+Shift+M" }),
-        item("재생목록 열기…", bind("load-m3u"), { key = "Ctrl+Shift+O" }),
-        item("이 항목 빼기", bind("playlist-remove"), { key = "Del", disabled = not has_file() }),
+        item(t("menu_open_panel"), bind("panel-pl"), { key = "F6" }),
+        item(t("menu_save_playlist"), bind("save-m3u"), { key = "Ctrl+Shift+M" }),
+        item(t("menu_load_playlist"), bind("load-m3u"), { key = "Ctrl+Shift+O" }),
+        item(t("menu_remove_item"), bind("playlist-remove"), { key = "Del", disabled = not has_file() }),
     })
 end
 
 sections.fav = function(out)
-    out[#out + 1] = submenu("즐겨찾기", {
-        item("지금 구간 담기", bind("favorite-add"), { key = "Insert", disabled = not has_file() }),
-        item("[ 구간 시작", bind("ab-a"), { key = "[", disabled = not has_file() }),
-        item("] 구간 끝", bind("ab-b"), { key = "]", disabled = not has_file() }),
+    out[#out + 1] = submenu(t("menu_clips"), {
+        item(t("menu_clip_add"), bind("favorite-add"), { key = "+", disabled = not has_file() }),
+        item(t("menu_clip_start"), bind("ab-a"), { key = "[", disabled = not has_file() }),
+        item(t("menu_clip_end"), bind("ab-b"), { key = "]", disabled = not has_file() }),
         SEP,
-        submenu("담아둔 구간", favorite_items()),
-        item("이 영상 즐겨찾기 비우기", bind("favorite-clear"), { disabled = not has_file() }),
+        submenu(t("menu_clip_saved"), favorite_items()),
+        item(t("menu_clip_clear"), bind("favorite-clear"), { disabled = not has_file() }),
     })
 end
 
 sections.chapter = function(out)
-    out[#out + 1] = submenu("챕터 · 북마크", {
-        submenu("이동", chapter_items()),
+    out[#out + 1] = submenu(t("menu_chapters"), {
+        submenu(t("menu_goto"), chapter_items()),
         SEP,
-        item("지금 위치 북마크", bind("bookmark-add"), { key = "P", disabled = not has_file() }),
-        item("이전 북마크", bind("bookmark-prev"), { key = "Shift+PgUp" }),
-        item("다음 북마크", bind("bookmark-next"), { key = "Shift+PgDn" }),
+        item(t("menu_bookmark_add"), bind("bookmark-add"), { key = "P", disabled = not has_file() }),
+        item(t("menu_bookmark_prev"), bind("bookmark-prev"), { key = "Shift+PgUp" }),
+        item(t("menu_bookmark_next"), bind("bookmark-next"), { key = "Shift+PgDn" }),
     })
 end
 
 sections.speed = function(out)
-    out[#out + 1] = submenu("속도", speed_items())
+    out[#out + 1] = submenu(t("menu_speed"), speed_items())
 end
 
 sections.loop = function(out)
     local a = mp.get_property("ab-loop-a")
     local b = mp.get_property("ab-loop-b")
-    out[#out + 1] = submenu("구간 반복", {
-        item("A 지점", bind("ab-a"), { key = "[" }),
-        item("B 지점", bind("ab-b"), { key = "]" }),
-        item("해제", bind("ab-clear"), { disabled = (a == "no" and b == "no") }),
+    out[#out + 1] = submenu(t("menu_loop"), {
+        item(t("menu_loop_a"), bind("ab-a"), { key = "[" }),
+        item(t("menu_loop_b"), bind("ab-b"), { key = "]" }),
+        item(t("menu_loop_clear"), bind("ab-clear"), { disabled = (a == "no" and b == "no") }),
         SEP,
-        item("이 구간 즐겨찾기에 담기", bind("favorite-add"), { key = "Insert" }),
-        item("파일 반복", "cycle-values loop-file inf no",
+        item(t("menu_loop_save"), bind("favorite-add"), { key = "+" }),
+        item(t("menu_loop_file"), "cycle-values loop-file inf no",
             { checked = tostring(mp.get_property("loop-file")) ~= "no" }),
-        item("목록 반복", "cycle-values loop-playlist inf no",
+        item(t("menu_loop_playlist"), "cycle-values loop-playlist inf no",
             { checked = tostring(mp.get_property("loop-playlist")) ~= "no" }),
     })
 end
 
 sections.skip = function(out)
     local skip = state.skip_of(mp.get_property("path"))
-    out[#out + 1] = submenu("건너뛰기", {
-        item("여기까지가 오프닝", bind("mark-intro"), { key = "Ctrl+I" }),
-        item("여기부터 엔딩", bind("mark-outro"), { key = "Ctrl+O" }),
-        item("이 영상 설정 지우기", bind("clear-skip"), { key = "Ctrl+Shift+I", disabled = skip == nil }),
+    out[#out + 1] = submenu(t("menu_skip"), {
+        item(t("menu_skip_intro"), bind("mark-intro"), { key = "Ctrl+I" }),
+        item(t("menu_skip_outro"), bind("mark-outro"), { key = "Ctrl+O" }),
+        item(t("menu_skip_clear"), bind("clear-skip"), { key = "Ctrl+Shift+I", disabled = skip == nil }),
     })
 end
 
 sections.video = function(out)
-    out[#out + 1] = submenu("영상", {
-        submenu("트랙", tracks_of("video", "vid")),
-        submenu("화면 비율", aspect_items()),
+    out[#out + 1] = submenu(t("menu_video"), {
+        submenu(t("menu_tracks"), tracks_of("video", "vid")),
+        submenu(t("menu_aspect"), aspect_items()),
         SEP,
-        item("좌우 반전", bind("flip-h"), { key = "Ctrl+Z", checked = vf_on("hflip") }),
-        item("상하 반전", bind("flip-v"), { key = "Ctrl+P", checked = vf_on("vflip") }),
-        item("90도 회전", bind("rotate"), { key = "Alt+K" }),
+        item(t("menu_flip_h"), bind("flip-h"), { key = "Ctrl+Z", checked = vf_on("hflip") }),
+        item(t("menu_flip_v"), bind("flip-v"), { key = "Ctrl+P", checked = vf_on("vflip") }),
+        item(t("menu_rotate"), bind("rotate"), { key = "Alt+K" }),
         SEP,
-        submenu("화질 보정", {
-            item("선명 업스케일", bind("upscale-toggle"),
+        submenu(t("menu_quality"), {
+            item(t("menu_upscale"), bind("upscale-toggle"),
                 { key = "F9", checked = mp.get_property("scale") == "ewa_lanczossharp" }),
-            item("샤픈", bind("sharpen"), { key = "Ctrl+R", checked = vf_on("sharp") }),
-            item("블러", bind("blur"), { key = "Ctrl+B", checked = vf_on("blur") }),
-            item("노이즈 감소", bind("denoise"), { key = "Ctrl+N", checked = vf_on("dn") }),
-            item("디블록", bind("deblock"), { key = "Ctrl+H", checked = vf_on("deblock") }),
-            item("디인터레이스", "cycle deinterlace",
+            item(t("menu_sharpen"), bind("sharpen"), { key = "Ctrl+R", checked = vf_on("sharp") }),
+            item(t("menu_blur"), bind("blur"), { key = "Ctrl+B", checked = vf_on("blur") }),
+            item(t("menu_denoise"), bind("denoise"), { key = "Ctrl+N", checked = vf_on("dn") }),
+            item(t("menu_deblock"), bind("deblock"), { key = "Ctrl+H", checked = vf_on("deblock") }),
+            item(t("menu_deinterlace"), "cycle deinterlace",
                 { key = "Ctrl+Shift+D", checked = mp.get_property("deinterlace") == "yes" }),
             SEP,
-            item("영상 필터 모두 해제", bind("filters-clear"), { key = "Ctrl+Alt+F" }),
+            item(t("menu_filters_clear"), bind("filters-clear"), { key = "Ctrl+Alt+F" }),
         }),
     }, { disabled = not has_file() })
 end
 
 sections.audio = function(out)
-    out[#out + 1] = submenu("소리", {
-        submenu("트랙", tracks_of("audio", "aid")),
-        submenu("출력 장치", audio_devices()),
+    out[#out + 1] = submenu(t("menu_audio"), {
+        submenu(t("menu_tracks"), tracks_of("audio", "aid")),
+        submenu(t("menu_devices"), audio_devices()),
         SEP,
-        item("음소거", "cycle mute", { key = "M", checked = mp.get_property_bool("mute") }),
-        item("음량 평준화", bind("audio-norm"), { key = "N", checked = af_on("norm") }),
-        item("좌우 채널 교환", bind("stereo-swap"), { key = "T", checked = af_on("swap") }),
-        item("보컬 제거 시도", bind("voice-remove"),
+        item(t("menu_mute"), "cycle mute", { key = "M", checked = mp.get_property_bool("mute") }),
+        item(t("menu_norm"), bind("audio-norm"), { key = "N", checked = af_on("norm") }),
+        item(t("menu_swap"), bind("stereo-swap"), { key = "T", checked = af_on("swap") }),
+        item(t("menu_voice"), bind("voice-remove"),
             { key = "Ctrl+Shift+V", checked = af_on("voice") }),
         SEP,
-        item("싱크 당기기 (-0.05초)", "add audio-delay -0.05", { key = "<" }),
-        item("싱크 미루기 (+0.05초)", "add audio-delay 0.05", { key = ">" }),
-        item("소리 설정 초기화", bind("audio-reset"), { key = "Ctrl+Alt+N" }),
+        item(t("menu_delay_earlier"), "add audio-delay -0.05", { key = "<" }),
+        item(t("menu_delay_later"), "add audio-delay 0.05", { key = ">" }),
+        item(t("menu_audio_reset"), bind("audio-reset"), { key = "Ctrl+Alt+N" }),
     })
 end
 
 sections.sub = function(out)
-    out[#out + 1] = submenu("자막", {
-        submenu("트랙", tracks_of("sub", "sid")),
-        item("자막 보이기", "cycle sub-visibility",
+    out[#out + 1] = submenu(t("menu_sub"), {
+        submenu(t("menu_tracks"), tracks_of("sub", "sid")),
+        item(t("menu_sub_visible"), "cycle sub-visibility",
             { key = "Alt+H", checked = mp.get_property_bool("sub-visibility") }),
         SEP,
-        item("자막 파일 열기…", bind("open-sub"), { key = "Alt+O" }),
-        item("자막 다시 찾기", bind("reload-sub"), { key = "Ctrl+Alt+Y" }),
-        item("듀얼 자막", bind("dual-sub"), { key = "F8" }),
+        item(t("menu_sub_open"), bind("open-sub"), { key = "Alt+O" }),
+        item(t("menu_sub_reload"), bind("reload-sub"), { key = "Ctrl+Alt+Y" }),
+        item(t("menu_sub_dual"), bind("dual-sub"), { key = "F8" }),
         SEP,
-        item("크게", "add sub-font-size 2", { key = "Alt+PgUp" }),
-        item("작게", "add sub-font-size -2", { key = "Alt+PgDn" }),
-        item("싱크 당기기 (-0.5초)", "add sub-delay -0.5", { key = "," }),
-        item("싱크 미루기 (+0.5초)", "add sub-delay 0.5", { key = "." }),
-        item("싱크 초기화", "set sub-delay 0", { key = "/" }),
+        item(t("menu_bigger"), "add sub-font-size 2", { key = "Alt+PgUp" }),
+        item(t("menu_smaller"), "add sub-font-size -2", { key = "Alt+PgDn" }),
+        item(t("menu_sub_earlier"), "add sub-delay -0.5", { key = "," }),
+        item(t("menu_sub_later"), "add sub-delay 0.5", { key = "." }),
+        item(t("menu_sub_reset"), "set sub-delay 0", { key = "/" }),
     })
 end
 
 sections.color = function(out)
-    out[#out + 1] = submenu("색감", {
-        item("색감 패널 열기", bind("panel-color"), { key = "F7" }),
-        item("자동 보정", bind("auto-color-toggle"),
+    out[#out + 1] = submenu(t("menu_color"), {
+        item(t("menu_color_panel"), bind("panel-color"), { key = "F7" }),
+        item(t("menu_auto_color"), bind("auto-color-toggle"),
             { key = "Ctrl+Alt+A", checked = state.prefs.auto_color == true }),
-        item("원본과 비교 (껐다 켜기)", bind("eq-toggle"), { key = "Q" }),
-        item("초기화", bind("eq-reset"), { key = "Ctrl+Alt+R" }),
+        item(t("menu_color_compare"), bind("eq-toggle"), { key = "Q" }),
+        item(t("menu_color_reset"), bind("eq-reset"), { key = "Ctrl+Alt+R" }),
         SEP,
-        item("밝기 +", "add brightness 1", { key = "E" }),
-        item("밝기 −", "add brightness -1", { key = "W" }),
-        item("대비 +", "add contrast 1", { key = "T" }),
-        item("대비 −", "add contrast -1", { key = "R" }),
-        item("채도 +", "add saturation 1", { key = "U" }),
-        item("채도 −", "add saturation -1", { key = "Y" }),
+        item(t("menu_brightness_up"), "add brightness 1", { key = "E" }),
+        item(t("menu_brightness_down"), "add brightness -1", { key = "W" }),
+        item(t("menu_contrast_up"), "add contrast 1", { key = "T" }),
+        item(t("menu_contrast_down"), "add contrast -1", { key = "R" }),
+        item(t("menu_saturation_up"), "add saturation 1", { key = "U" }),
+        item(t("menu_saturation_down"), "add saturation -1", { key = "Y" }),
     })
 end
 
 sections.window = function(out)
-    out[#out + 1] = submenu("창", {
-        item("전체화면", "cycle fullscreen",
+    out[#out + 1] = submenu(t("menu_window"), {
+        item(t("menu_fullscreen"), "cycle fullscreen",
             { key = "Enter", checked = mp.get_property_bool("fullscreen") }),
-        item("항상 위", "cycle ontop", { key = "Ctrl+T", checked = mp.get_property_bool("ontop") }),
-        item("PiP (작게 + 항상 위)", bind("pip"), { key = "F10" }),
+        item(t("menu_ontop"), "cycle ontop", { key = "Ctrl+T", checked = mp.get_property_bool("ontop") }),
+        item(t("menu_pip"), bind("pip"), { key = "F10" }),
         SEP,
-        item("0.5배", message("window-scale", 0.5), { key = "Alt+1" }),
-        item("1배", message("window-scale", 1), { key = "Alt+2" }),
-        item("1.5배", message("window-scale", 1.5), { key = "Alt+3" }),
-        item("2배", message("window-scale", 2), { key = "Alt+4" }),
-        item("최대화", bind("window-max"), { key = "Alt+5" }),
+        item("0.5x", message("window-scale", 0.5), { key = "Alt+1" }),
+        item("1x", message("window-scale", 1), { key = "Alt+2" }),
+        item("1.5x", message("window-scale", 1.5), { key = "Alt+3" }),
+        item("2x", message("window-scale", 2), { key = "Alt+4" }),
+        item(t("menu_maximise"), bind("window-max"), { key = "Alt+5" }),
     })
 end
 
 sections.capture = function(out)
-    out[#out + 1] = submenu("캡처 · 녹화", {
-        item("화면 저장 (자막 포함)", "screenshot", { key = "Ctrl+S" }),
-        item("원본 그대로 저장", "screenshot video", { key = "K" }),
-        item("보이는 대로 저장", "screenshot window", { key = "Alt+N" }),
-        item("클립보드로 복사", bind("shot-clipboard"), { key = "Ctrl+C" }),
+    out[#out + 1] = submenu(t("menu_capture"), {
+        item(t("menu_shot"), "screenshot", { key = "Ctrl+S" }),
+        item(t("menu_shot_video"), "screenshot video", { key = "K" }),
+        item(t("menu_shot_window"), "screenshot window", { key = "Alt+N" }),
+        item(t("menu_shot_clip"), bind("shot-clipboard"), { key = "Ctrl+C" }),
         SEP,
-        item("녹화 시작 / 중지", bind("record"), { key = "Ctrl+Shift+R" }),
+        item(t("menu_record"), bind("record"), { key = "Ctrl+Shift+R" }),
     }, { disabled = not has_file() })
 end
 
 sections.copy = function(out)
-    out[#out + 1] = submenu("복사", {
-        item("파일 경로", "set clipboard/text ${path}"),
-        item("파일 이름", "set clipboard/text ${filename}"),
-        item("제목", "set clipboard/text ${media-title}"),
-        item("현재 시간", "set clipboard/text ${time-pos}"),
-        item("지금 자막 문장", "set clipboard/text ${sub-text}"),
+    out[#out + 1] = submenu(t("menu_copy"), {
+        item(t("menu_copy_path"), "set clipboard/text ${path}"),
+        item(t("menu_copy_name"), "set clipboard/text ${filename}"),
+        item(t("menu_copy_title"), "set clipboard/text ${media-title}"),
+        item(t("menu_copy_time"), "set clipboard/text ${time-pos}"),
+        item(t("menu_copy_sub"), "set clipboard/text ${sub-text}"),
     }, { disabled = not has_file() })
 end
 
 sections.panel = function(out)
-    out[#out + 1] = submenu("패널", {
-        item("재생목록", bind("panel-pl"), { key = "F6" }),
-        item("오디오", bind("panel-audio"), { key = "A" }),
-        item("자막", bind("panel-sub"), { key = "L" }),
-        item("비디오", bind("panel-video"), { key = "V" }),
-        item("챕터", bind("panel-chapter"), { key = "H" }),
-        item("즐겨찾기", bind("panel-fav"), { key = "Ctrl+Insert" }),
-        item("색감", bind("panel-color"), { key = "F7" }),
+    out[#out + 1] = submenu(t("menu_panel"), {
+        item(t("tab_playlist"), bind("panel-pl"), { key = "F6" }),
+        item(t("tab_audio"), bind("panel-audio"), { key = "A" }),
+        item(t("tab_sub"), bind("panel-sub"), { key = "L" }),
+        item(t("tab_video"), bind("panel-video"), { key = "V" }),
+        item(t("tab_chapter"), bind("panel-chapter"), { key = "H" }),
+        item(t("tab_fav"), bind("panel-fav"), { key = "Ctrl+Insert" }),
+        item(t("tab_color"), bind("panel-color"), { key = "F7" }),
     })
 end
 
 sections.settings = function(out)
-    out[#out + 1] = submenu("설정 · 정보", {
-        item("설정 폴더 열기", bind("open-config"), { key = "F5" }),
-        item("재생 통계", "script-binding stats/display-stats-toggle", { key = "Ctrl+F1" }),
-        item("콘솔", "script-binding console/enable", { key = "Ctrl+F12" }),
+    out[#out + 1] = submenu(t("menu_settings"), {
+        item(t("menu_config_folder"), bind("open-config"), { key = "F5" }),
+        item(t("menu_stats"), "script-binding stats/display-stats-toggle", { key = "Ctrl+F1" }),
+        item(t("menu_console"), "script-binding console/enable", { key = "Ctrl+F12" }),
         SEP,
-        item("boda 정보", bind("about"), { key = "F1" }),
+        item(t("menu_about"), bind("about"), { key = "F1" }),
     })
 end
 
@@ -446,14 +447,15 @@ local function wanted_order()
     return out
 end
 
--- ── 상황별 메뉴 ─────────────────────────────────────────────────────
+-- ── menus per context ──────────────────────────────────────────────
 local function main_menu()
     local paused = mp.get_property_bool("pause")
     local out = {
-        item(paused and "재생" or "일시정지", "cycle pause", { key = "Space", disabled = not has_file() }),
-        item("정지", "stop", { key = "Ctrl+F4", disabled = not has_file() }),
-        item("이전 파일", "playlist-prev", { key = "PgUp" }),
-        item("다음 파일", "playlist-next", { key = "PgDn" }),
+        item(paused and t("menu_play") or t("menu_pause"), "cycle pause",
+            { key = "Space", disabled = not has_file() }),
+        item(t("menu_stop"), "stop", { key = "Ctrl+F4", disabled = not has_file() }),
+        item(t("menu_prev_file"), "playlist-prev", { key = "PgUp" }),
+        item(t("menu_next_file"), "playlist-next", { key = "PgDn" }),
         SEP,
     }
     for _, name in ipairs(wanted_order()) do
@@ -464,46 +466,46 @@ local function main_menu()
         end
     end
     out[#out + 1] = SEP
-    out[#out + 1] = item("종료", "quit", { key = "Alt+F4" })
+    out[#out + 1] = item(t("menu_quit"), "quit", { key = "Alt+F4" })
     return out
 end
 
--- 목록 패널 위에서 누른 경우: 그 줄에 대한 메뉴
+-- Pressed over a playlist row: a menu for that row
 local function playlist_menu(index)
     local pl = mp.get_property_native("playlist") or {}
     local e = pl[index + 1]
-    local name = e and util.basename(e.title or e.filename) or "항목"
+    local name = e and util.basename(e.title or e.filename) or t("menu_items")
     return {
         item(name, "", { disabled = true }),
         SEP,
-        item("재생", "playlist-play-index " .. index),
-        item("목록에서 빼기", "playlist-remove " .. index),
+        item(t("menu_this_item"), "playlist-play-index " .. index),
+        item(t("menu_remove"), "playlist-remove " .. index),
         SEP,
-        submenu("정렬", sort_items()),
-        item("폴더 열기…", bind("open-folder"), { key = "F2" }),
-        item("재생목록 저장", bind("save-m3u")),
+        submenu(t("menu_sort"), sort_items()),
+        item(t("menu_idle_folder"), bind("open-folder"), { key = "F2" }),
+        item(t("menu_save_playlist"), bind("save-m3u")),
         SEP,
-        item("패널 닫기", bind("panel-toggle"), { key = "F6" }),
+        item(t("menu_close_panel"), bind("panel-toggle"), { key = "F6" }),
     }
 end
 
 local function idle_menu()
     return {
-        item("파일 열기…", bind("open-file"), { key = "F3" }),
-        item("폴더 열기…", bind("open-folder"), { key = "F2" }),
-        item("URL / 경로 입력…", bind("open-url"), { key = "Ctrl+U" }),
-        item("클립보드 주소 열기", bind("open-clipboard"), { key = "Ctrl+V" }),
+        item(t("menu_idle_file"), bind("open-file"), { key = "F3" }),
+        item(t("menu_idle_folder"), bind("open-folder"), { key = "F2" }),
+        item(t("menu_open_url"), bind("open-url"), { key = "Ctrl+U" }),
+        item(t("menu_open_clipboard"), bind("open-clipboard"), { key = "Ctrl+V" }),
         SEP,
-        submenu("이어서 보기", history_items()),
-        submenu("최근 폴더", recent_folders()),
+        submenu(t("menu_resume"), history_items()),
+        submenu(t("menu_recent_folders"), recent_folders()),
         SEP,
-        item("설정 폴더 열기", bind("open-config"), { key = "F5" }),
-        item("종료", "quit", { key = "Alt+F4" }),
+        item(t("menu_config_folder"), bind("open-config"), { key = "F5" }),
+        item(t("menu_quit"), "quit", { key = "Alt+F4" }),
     }
 end
 
--- 어떤 메뉴를 띄울지 고른다.
--- 마우스로 불렀을 때만 커서 아래를 본다. 키(F4)로 부르면 커서가 어디에 있든 기본 메뉴.
+-- Choose which menu to show.
+-- Only look under the cursor for mouse presses; a key (F4) always gets the main menu.
 local function pick_menu(from_mouse)
     if not has_file() then return idle_menu(), "idle" end
     local x, y
@@ -522,10 +524,10 @@ local function pick_menu(from_mouse)
     return main_menu(), "main"
 end
 
--- ── 내장 메뉴가 없을 때 (mp.input.select 로 대체) ───────────────────
+-- ── fallback when there is no native menu ─────────────────────────
 local function show_fallback(items, title)
     if not (has_input and input and input.select) then
-        mp.osd_message("이 환경에서는 우클릭 메뉴를 쓸 수 없습니다", 2)
+        mp.osd_message(t("menu_unavailable"), 2)
         return
     end
     local labels, acts = {}, {}
@@ -552,7 +554,7 @@ local function show_fallback(items, title)
     end
     if #labels == 0 then return end
     input.select({
-        prompt = title or "메뉴",
+        prompt = title or t("menu_title"),
         items = labels,
         default_item = 1,
         submit = function(i)
@@ -567,7 +569,7 @@ local function show_fallback(items, title)
     })
 end
 
--- ── 띄우기 ──────────────────────────────────────────────────────────
+-- ── showing it ─────────────────────────────────────────────────────
 local function show(from_mouse)
     local items, kind = pick_menu(from_mouse)
     M.last_kind = kind
@@ -580,25 +582,25 @@ local function show(from_mouse)
                 native_ok = true
                 return
             end
-            -- 명령이 실패하면 아래 대체 방식으로 간다
+            -- if the command fails, fall through to the list below
             native_ok = false
         else
             native_ok = false
         end
     end
-    show_fallback(items, "메뉴")
+    show_fallback(items, t("menu_title"))
 end
 
 function M.init()
-    -- 마우스로 눌렀는지 키로 눌렀는지 구분한다 (complex 로 받아야 알 수 있다)
+    -- complex bindings tell us whether a mouse button or a key triggered this
     mp.add_key_binding(nil, "menu", function(e)
         if e and e.event and e.event ~= "down" and e.event ~= "press" then return end
         show(e and e.is_mouse == true)
     end, { complex = true })
     mp.register_script_message("boda-menu", function() show(false) end)
 
-    -- 테스트·디버깅용: 메뉴를 띄우지 않고 트리만 만들어 속성으로 내보낸다.
-    -- (실제로 context-menu 를 부르면 창이 뜨고 사용자가 닫을 때까지 멈춘다)
+    -- For tests and debugging: build the tree and publish it without showing a menu.
+    -- (calling context-menu for real blocks until the user dismisses the menu)
     mp.register_script_message("boda-menu-build", function(which)
         local items, kind
         if which == "idle" then
@@ -614,15 +616,15 @@ function M.init()
             items, kind = main_menu(), "main"
         end
         pcall(mp.set_property_native, "menu-data", items)
-        -- menu-data 는 mpv 기본 메뉴가 다시 쓸 수 있으므로, 확인용으로 우리 트리도 따로 둔다
+        -- mpv's own default menu may overwrite menu-data, so publish our tree separately
         pcall(mp.set_property_native, "user-data/boda/menu",
             { kind = kind, count = #items, tree = items })
     end)
 
-    -- 내장 메뉴가 없는 환경에서 쓰는 대체 방식만 따로 띄워본다
+    -- Show just the fallback list, the way a machine without the native menu would
     mp.register_script_message("boda-menu-fallback", function()
         local items = select(1, pick_menu(true))
-        show_fallback(items, "메뉴")
+        show_fallback(items, t("menu_title"))
     end)
 end
 

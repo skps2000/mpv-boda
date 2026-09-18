@@ -1,14 +1,15 @@
--- 열기 계열. 파일/폴더 선택은 Windows 대화상자를 쓰고,
--- 짧은 입력(URL, 시간 이동)은 mpv 안에서 받는다 (PowerShell 창을 띄우지 않는다).
+-- Opening things. File and folder pickers use the Windows dialogs; short input
+-- (URL, jump to time) is taken inside mpv, without spawning a PowerShell window.
 local mp = require("mp")
 local util = require("lib.util")
 local state = require("lib.state")
+local t = require("lib.i18n").t
 
 local M = {}
 
 local has_input, input = pcall(require, "mp.input")
 
--- 대화상자는 비동기로 띄운다. 예전에는 동기 호출이라 창이 떠 있는 동안 UI가 멈췄다.
+-- Dialogs run asynchronously; the old synchronous call froze the UI while open.
 local function ps_async(script, cb)
     mp.command_native_async({
         name = "subprocess",
@@ -23,6 +24,26 @@ end
 
 local function ps_quote(s)
     return "'" .. tostring(s or ""):gsub("'", "''") .. "'"
+end
+
+-- Windows dialog filters look like "Label|*.a;*.b|Label|*.*"
+local MEDIA_EXT = "*.mkv;*.mp4;*.avi;*.webm;*.mov;*.ts;*.m2ts;*.wmv;*.flv;*.mpg;*.mpeg;*.m4v;"
+    .. "*.flac;*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.opus"
+local SUB_EXT = "*.srt;*.ass;*.ssa;*.vtt;*.sub;*.smi"
+local LIST_EXT = "*.m3u;*.m3u8"
+
+local function media_filter()
+    return ps_quote(t("filter_media") .. "|" .. MEDIA_EXT
+        .. "|" .. t("filter_playlist") .. "|" .. LIST_EXT
+        .. "|" .. t("filter_all") .. "|*.*")
+end
+
+local function sub_filter()
+    return ps_quote(t("filter_sub") .. "|" .. SUB_EXT .. "|" .. t("filter_all") .. "|*.*")
+end
+
+local function playlist_filter()
+    return ps_quote(t("filter_playlist") .. "|" .. LIST_EXT .. "|" .. t("filter_all") .. "|*.*")
 end
 
 local function start_dir()
@@ -75,35 +96,37 @@ function M.init()
 Add-Type -AssemblyName System.Windows.Forms
 $f = New-Object System.Windows.Forms.OpenFileDialog
 $f.Multiselect = $true
-$f.Title = '파일 열기'
+$f.Title = ]] .. ps_quote(t("dlg_file")) .. [[
+
 $f.InitialDirectory = ]] .. ps_quote(start_dir()) .. [[
 
-$f.Filter = '동영상/음악|*.mkv;*.mp4;*.avi;*.webm;*.mov;*.ts;*.m2ts;*.wmv;*.flv;*.mpg;*.mpeg;*.m4v' +
-  ';*.flac;*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.opus|재생목록|*.m3u;*.m3u8|모든 파일|*.*'
+$f.Filter = ]] .. media_filter() .. [[
+
 if ($f.ShowDialog() -eq 'OK') { $f.FileNames -join "`n" }
 ]], function(out) open_paths(out, "replace") end)
     end)
 
-    -- 폴더를 열면 하위 폴더까지 전부 훑어서 재생목록에 넣는다.
+    -- Opening a folder walks every subfolder and puts it all in the playlist.
     local function load_folder(dir)
         if not dir or dir == "" then return end
         dir = dir:gsub("[\\/]+$", "")
         if not util.exists(dir) then
-            mp.osd_message("폴더를 찾을 수 없습니다\n" .. dir, 2.5)
+            mp.osd_message(t("folder_missing", dir), 2.5)
             state.forget_folder(dir)
             return
         end
         state.remember_folder(dir)
         mp.commandv("loadfile", dir, "replace", -1, "directory-mode=recursive")
         mp.set_property_bool("pause", false)
-        mp.osd_message("폴더 열기: " .. dir, 2)
+        mp.osd_message(t("folder_opened", dir), 2)
     end
 
     local function browse_folder()
         ps_async([[
 Add-Type -AssemblyName System.Windows.Forms
 $d = New-Object System.Windows.Forms.FolderBrowserDialog
-$d.Description = '폴더 열기'
+$d.Description = ]] .. ps_quote(t("dlg_folder")) .. [[
+
 $d.SelectedPath = ]] .. ps_quote(start_dir()) .. [[
 
 if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }
@@ -112,7 +135,7 @@ if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }
         end)
     end
 
-    -- F2: 최근 폴더를 위에 세워 바로 고르게 하고, 맨 아래에서 찾아보기로 넘어간다.
+    -- F2: recent folders first so you can pick one right away, browsing at the end.
     action("open-folder", function()
         local dirs = {}
         for _, d in ipairs(state.recent or {}) do dirs[#dirs + 1] = d end
@@ -122,9 +145,9 @@ if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }
         end
         local items = {}
         for i, d in ipairs(dirs) do items[i] = d end
-        items[#items + 1] = "▸ 폴더 찾아보기…"
+        items[#items + 1] = "▸ " .. t("folder_browse")
         input.select({
-            prompt = "폴더 열기 — 최근 폴더",
+            prompt = t("folder_pick"),
             items = items,
             default_item = 1,
             submit = function(i)
@@ -135,7 +158,7 @@ if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }
 
     mp.add_key_binding(nil, "browse-folder", browse_folder)
 
-    -- 메뉴에서 최근 폴더를 번호로 고른다
+    -- Pick a recent folder by index (used by the menu)
     mp.register_script_message("boda-open-recent", function(n)
         local dir = (state.recent or {})[tonumber(n) or 0]
         if dir then load_folder(dir) end
@@ -145,16 +168,18 @@ if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }
         ps_async([[
 Add-Type -AssemblyName System.Windows.Forms
 $f = New-Object System.Windows.Forms.OpenFileDialog
-$f.Title = '자막 열기'
+$f.Title = ]] .. ps_quote(t("dlg_sub")) .. [[
+
 $f.InitialDirectory = ]] .. ps_quote(start_dir()) .. [[
 
-$f.Filter = '자막|*.srt;*.ass;*.ssa;*.vtt;*.sub;*.smi|모든 파일|*.*'
+$f.Filter = ]] .. sub_filter() .. [[
+
 if ($f.ShowDialog() -eq 'OK') { $f.FileName }
 ]], function(out)
             local path = out:gsub("%s+$", "")
             if path ~= "" then
                 mp.commandv("sub-add", path)
-                mp.osd_message("자막 추가: " .. util.basename(path))
+                mp.osd_message(t("sub_added", util.basename(path)))
             end
         end)
     end)
@@ -163,8 +188,10 @@ if ($f.ShowDialog() -eq 'OK') { $f.FileName }
         ps_async([[
 Add-Type -AssemblyName System.Windows.Forms
 $f = New-Object System.Windows.Forms.OpenFileDialog
-$f.Title = '재생목록 열기'
-$f.Filter = '재생목록|*.m3u;*.m3u8|모든 파일|*.*'
+$f.Title = ]] .. ps_quote(t("dlg_playlist")) .. [[
+
+$f.Filter = ]] .. playlist_filter() .. [[
+
 if ($f.ShowDialog() -eq 'OK') { $f.FileName }
 ]], function(out)
             local path = out:gsub("%s+$", "")
@@ -173,19 +200,19 @@ if ($f.ShowDialog() -eq 'OK') { $f.FileName }
     end)
 
     action("open-url", function()
-        ask("URL 또는 경로: ", "", function(text)
+        ask(t("prompt_url"), "", function(text)
             mp.commandv("loadfile", text, "replace")
             mp.set_property_bool("pause", false)
         end)
     end)
 
     action("jump-time", function()
-        ask("이동할 시간 (1:23:00 또는 90): ", "", function(text)
+        ask(t("prompt_time"), "", function(text)
             mp.commandv("seek", (text:gsub("%s", "")), "absolute")
         end)
     end)
 
-    -- 클립보드는 mpv 속성으로 바로 읽는다 (PowerShell 필요 없음).
+    -- The clipboard is read straight from an mpv property, no PowerShell needed.
     action("open-clipboard", function()
         local text = mp.get_property("clipboard/text")
         if text and text ~= "" then
@@ -193,18 +220,18 @@ if ($f.ShowDialog() -eq 'OK') { $f.FileName }
             if text ~= "" then
                 mp.commandv("loadfile", text, "replace")
                 mp.set_property_bool("pause", false)
-                mp.osd_message("클립보드에서 열기")
+                mp.osd_message(t("clipboard_opened"))
                 return
             end
         end
         ps_async("Get-Clipboard -Raw", function(out)
-            local t = out:gsub("^%s+", ""):gsub("%s+$", "")
-            if t ~= "" then
-                mp.commandv("loadfile", t, "replace")
+            local text = out:gsub("^%s+", ""):gsub("%s+$", "")
+            if text ~= "" then
+                mp.commandv("loadfile", text, "replace")
                 mp.set_property_bool("pause", false)
-                mp.osd_message("클립보드에서 열기")
+                mp.osd_message(t("clipboard_opened"))
             else
-                mp.osd_message("클립보드가 비어 있습니다")
+                mp.osd_message(t("clipboard_empty"))
             end
         end)
     end)

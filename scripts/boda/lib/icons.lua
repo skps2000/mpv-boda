@@ -1,4 +1,4 @@
--- ASS 드로잉 아이콘. 이모지 글꼴이 없거나 다른 PC에서 깨지는 일이 없도록 직접 그린다.
+-- Icons drawn with ASS shapes, so they never depend on an emoji font.
 local M = {}
 
 local function rect(x, y, w, h)

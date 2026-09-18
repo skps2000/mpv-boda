@@ -1,4 +1,4 @@
--- 공통 유틸: ASS 이스케이프, 글자 폭 추정, 시간/경로, JSON 저장.
+-- Shared helpers: ASS escaping, text width, time and path formatting, JSON files.
 local mp = require("mp")
 local utils = require("mp.utils")
 
@@ -14,18 +14,18 @@ function M.round(v)
     return math.floor((tonumber(v) or 0) + 0.5)
 end
 
--- ── ASS 이스케이프 ──────────────────────────────────────────────────
--- libass 는 \N \h \{ 같은 시퀀스를 해석한다. 그냥 넣으면 "D:\New" 가 줄바꿈이 된다.
--- mpv 의 escape-ass 명령과 같은 일을 Lua 안에서 한다.
--- 명령으로 부르면 글자 한 덩이마다 mpv 코어와 왕복해서,
--- 목록 40줄을 처음 그리는 데만 0.7초가 걸렸다.
+-- ── ASS escaping ──────────────────────────────────────────────────
+-- libass reads sequences like \N \h \{ , so a raw "D:\New" turns into a line break.
+-- This does what mpv's escape-ass command does, but inside Lua:
+-- calling the command means a round trip to the mpv core per string, which cost
+-- 0.7 s just to draw 40 playlist rows the first time.
 local esc_cache, esc_count = {}, 0
 
 function M.esc(s)
     s = tostring(s or "")
     local cached = esc_cache[s]
     if cached then return cached end
-    -- 역슬래시 뒤에 U+2060 을 끼워 \N \h 같은 시퀀스를 끊는다
+    -- put U+2060 after a backslash so \N and friends stop being sequences
     local out = s:gsub("\\", "\\\226\129\160")
     out = out:gsub("([{}])", "\\%1")
     if esc_count > 2000 then
@@ -36,8 +36,8 @@ function M.esc(s)
     return out
 end
 
--- ── 글자 폭 추정 ────────────────────────────────────────────────────
--- libass 에 실제 폭을 물어보려면 오버레이를 따로 그려야 해서, 폭을 추정해 자른다.
+-- ── text width ────────────────────────────────────────────────────
+-- Asking libass for the real width needs a separate overlay pass, so estimate it.
 function M.codepoints(s)
     local i, n = 1, #s
     return function()
@@ -69,7 +69,7 @@ local function em(cp)
             or (cp >= 0xFF00 and cp <= 0xFF60)
             or (cp >= 0xFFE0 and cp <= 0xFFE6)
             or cp >= 0x20000 then
-            return 1.0 -- 한글/한자/전각
+            return 1.0 -- Hangul, Han, full width
         end
         return 0.62
     end
@@ -86,7 +86,7 @@ function M.text_width(s, size)
     return w
 end
 
--- 폭에 맞춰 자르고 말줄임표를 붙인다. 창이 작아도 글자가 밖으로 나가지 않게 한다.
+-- Cut to width and add an ellipsis so text never spills out of a small window.
 function M.truncate(s, size, max_w)
     s = tostring(s or "")
     if max_w <= 0 then return "" end
@@ -104,7 +104,7 @@ function M.truncate(s, size, max_w)
     return table.concat(out) .. "…"
 end
 
--- ── 시간 / 경로 ─────────────────────────────────────────────────────
+-- ── time and paths ────────────────────────────────────────────────
 function M.fmt_time(t)
     t = math.max(0, math.floor(tonumber(t) or 0))
     local s, m, h = t % 60, math.floor(t / 60) % 60, math.floor(t / 3600)
@@ -146,7 +146,7 @@ function M.exists(path)
     return path ~= nil and path ~= "" and utils.file_info(path) ~= nil
 end
 
--- "ep2" 가 "ep10" 보다 앞에 오도록 숫자를 숫자로 비교한다.
+-- Compare digits as numbers so "ep2" sorts before "ep10".
 function M.natural_less(a, b)
     a, b = tostring(a or ""):lower(), tostring(b or ""):lower()
     local ai, bi = 1, 1
@@ -166,7 +166,7 @@ function M.natural_less(a, b)
     end
 end
 
--- ── JSON 파일 ───────────────────────────────────────────────────────
+-- ── JSON files ────────────────────────────────────────────────────
 function M.read_json(path)
     local f = io.open(path, "rb")
     if not f then return nil end

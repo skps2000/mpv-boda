@@ -9,22 +9,22 @@ permissions:
 
 jobs:
   zip:
-    name: 배포용 zip 만들기
+    name: Build the zip
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: zip 묶기
+      - name: Pack
         run: |
           mkdir -p dist/mpv
           cp -r mpv.conf input.conf script-opts scripts README.md LICENSE dist/mpv/
           cd dist
           zip -r "../boda-${GITHUB_REF_NAME}.zip" mpv
 
-      - name: 릴리스에 올리기
+      - name: Upload to the release
         uses: softprops/action-gh-release@v2
         with:
           files: boda-*.zip
           body: |
-            `%APPDATA%\mpv` 안에 풀면 됩니다. 기존 설정은 먼저 백업하세요.
-            자세한 내용은 [README](https://github.com/skps2000/mpv-boda#readme)를 봐주세요.
+            Unpack into `%APPDATA%\mpv`. Back up your current config first.
+            See the [README](https://github.com/skps2000/mpv-boda#readme) for the rest.

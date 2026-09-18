@@ -1,9 +1,10 @@
--- 이어보기 기록. 저장 시점이 중요한데, end-file/shutdown 에서는 이미 path 와
--- time-pos 를 읽을 수 없다. 그래서 파일이 내려가기 직전인 on_unload 훅을 쓴다.
+-- Watch history. Timing matters: at end-file and shutdown the path and time-pos
+-- are already gone, so the on_unload hook does the saving instead.
 local mp = require("mp")
 local util = require("lib.util")
 local state = require("lib.state")
 local opts = require("lib.options")
+local t = require("lib.i18n").t
 
 local M = {}
 
@@ -49,9 +50,9 @@ local function on_loaded()
         local dur = mp.get_property_number("duration") or 0
         if h and (h.pos or 0) > 3 and cur < 2 and (dur <= 0 or h.pos < dur * 0.92) then
             mp.commandv("seek", h.pos, "absolute")
-            mp.osd_message("이어보기 " .. util.fmt_time(h.pos), 1.5)
+            mp.osd_message(t("resume_at", util.fmt_time(h.pos)), 1.5)
         elseif cur > 2 then
-            mp.osd_message("이어보기 " .. util.fmt_time(cur), 1.2)
+            mp.osd_message(t("resume_at", util.fmt_time(cur)), 1.2)
         end
     end
     snapshot()
@@ -67,7 +68,7 @@ function M.init()
         if paused then snapshot() end
     end)
 
-    -- 메뉴/대기 화면에서 기록을 번호로 연다
+    -- Open an entry by index (used by the menu and the idle screen)
     mp.register_script_message("boda-play-history", function(n)
         local h = (state.history or {})[tonumber(n) or 0]
         if not h or not h.path then return end
@@ -79,7 +80,7 @@ function M.init()
         state.history = {}
         state.mark("history")
         state.flush()
-        mp.osd_message("기록을 지웠습니다")
+        mp.osd_message(t("history_cleared"))
     end)
 end
 

@@ -1,18 +1,18 @@
--- boda 패널 조작 테스트
+-- boda panel tests
 --
--- 실제 마우스 이동·클릭·드래그·휠을 흉내내서 패널이 제대로 반응하는지 확인한다.
--- 창이 있어야 하므로 headless 로는 돌지 않는다. 실행 방법은 tests/README.md 참고.
+-- Replays real mouse moves, clicks, drags and wheel events to see how the panel
+-- reacts. A window is needed, so this does not run headless. See tests/README.md.
 --
---   mpv --script=tests/panel-ui.lua --script-opts=boda-state_dir=<임시폴더> <영상 폴더의 첫 파일>
+--   mpv --script=tests/panel-ui.lua --script-opts=boda-state_dir=<tmp> <first file>
 --
--- 영상은 30개 이상 들어 있는 폴더로 시험해야 스크롤 관련 항목이 의미가 있다.
+-- Use a folder with 30+ videos, otherwise the scrolling checks mean nothing.
 
 local mp = require("mp")
 
 local pass, fail = 0, 0
 local queue, qi = {}, 0
 local saved = {}
-local loads = 0 -- 파일이 몇 번 새로 읽혔는지 (같은 항목을 다시 눌렀을 때 재시작하는지 확인용)
+local loads = 0 -- how often a file was loaded (to catch an unwanted restart)
 
 local function log(s) mp.msg.warn("T " .. s) end
 
@@ -27,6 +27,8 @@ local function check(name, ok, detail)
 end
 
 local function info() return mp.get_property_native("user-data/boda/panel") or {} end
+local function idle_info() return mp.get_property_native("user-data/boda/idle") or {} end
+local function errors() return mp.get_property_native("user-data/boda/errors") or {} end
 local function mouse(x, y) mp.commandv("mouse", math.floor(x), math.floor(y)) end
 
 local function click(x, y)
@@ -48,8 +50,8 @@ end
 
 local function step(delay, fn) queue[#queue + 1] = { delay = delay, fn = fn } end
 
--- 누른 채로 끌기. 사람 손처럼 시간 간격을 둬야 한다
--- (한 번에 몰아 보내면 mpv 가 순서대로 처리하기 전에 끝나버린다).
+-- Drag with the button held. Steps need time between them, like a real hand:
+-- sent all at once, mpv never processes them in order.
 local function drag_steps(plan_fn)
     local plan
     step(0.15, function()
@@ -79,29 +81,29 @@ local function run_next()
     qi = qi + 1
     local s = queue[qi]
     if not s then
-        log(string.format("RESULT %d 통과 / %d 실패", pass, fail))
+        log(string.format("RESULT %d pass / %d fail", pass, fail))
         mp.commandv("quit", fail == 0 and 0 or 1)
         return
     end
     local ok, err = pcall(s.fn)
     if not ok then
         fail = fail + 1
-        log("FAIL  단계 " .. qi .. " 예외: " .. tostring(err))
+        log("FAIL  step " .. qi .. " raised: " .. tostring(err))
     end
     mp.add_timeout(s.delay, run_next)
 end
 
--- ── 1. 정주행: 재생 중 목록 스크롤 ──────────────────────────────────
+-- ── 1. scrolling the list while playing ─────────────────────────────
 step(0.6, function()
-    log("[1] 재생 중 목록 스크롤")
+    log("[1] scrolling while playing")
     mp.set_property_bool("pause", false)
     mp.commandv("script-message", "boda-panel", "pl")
 end)
 
 step(0.8, function()
     local n = info()
-    check("패널이 열린다", n.open == true, "open=" .. tostring(n.open))
-    check("한 화면에 다 안 들어와 스크롤이 필요하다", (n.max_scroll or 0) > 0,
+    check("the panel opens", n.open == true, "open=" .. tostring(n.open))
+    check("the list is longer than the screen", (n.max_scroll or 0) > 0,
         "rows=" .. tostring(n.rows) .. " vis=" .. tostring(n.vis))
     saved.scroll0 = n.scroll
 end)
@@ -113,45 +115,57 @@ end)
 
 step(0.5, function()
     local n = info()
-    check("휠로 목록이 내려간다", n.scroll == (saved.scroll0 or 0) + 5, "scroll=" .. tostring(n.scroll))
+    check("the wheel scrolls down", n.scroll == (saved.scroll0 or 0) + 5, "scroll=" .. tostring(n.scroll))
     saved.scroll1 = n.scroll
 end)
 
 step(1.5, function()
-    check("재생이 계속돼도 스크롤 위치가 유지된다", info().scroll == saved.scroll1,
+    check("the scroll position holds while playback continues", info().scroll == saved.scroll1,
         "scroll=" .. tostring(info().scroll))
 end)
 
+-- Paused from here: the list re-centres on the playing row when the file
+-- changes, and with short test clips that lands right on top of this check.
+step(0.3, function() mp.set_property_bool("pause", true) end)
+
 step(0.3, function()
     local n = info()
+    wheel(n.x0 + n.width / 2, n.oh / 2, -1, 5)
+end)
+
+step(0.4, function()
+    local n = info()
+    saved.scroll2 = n.scroll
     wheel(n.x0 + n.width / 2, n.oh / 2, 1, 2)
 end)
 
 step(0.5, function()
-    check("휠 위로도 움직인다", info().scroll == saved.scroll1 - 2, "scroll=" .. tostring(info().scroll))
+    check("the wheel scrolls back up", info().scroll == saved.scroll2 - 2,
+        string.format("scroll=%s from=%s", tostring(info().scroll), tostring(saved.scroll2)))
+    mp.set_property_bool("pause", false)
 end)
 
--- ── 2. 목록에서 다른 화 고르기 ──────────────────────────────────────
+-- ── 2. picking another file ─────────────────────────────────────────
 step(0.3, function()
-    log("[2] 클릭해서 재생")
+    log("[2] click to play")
     saved.target = info().scroll + 2
     local x, y = row_xy(3)
     click(x, y)
 end)
 
 step(0.8, function()
-    check("한 번 클릭하면 그 화가 재생된다", mp.get_property_number("playlist-pos") == saved.target,
+    check("one click plays that row", mp.get_property_number("playlist-pos") == saved.target,
         "pos=" .. tostring(mp.get_property_number("playlist-pos")) ..
-        " (기대 " .. tostring(saved.target) .. ")")
-    check("클릭해도 재생이 멈추지 않는다", mp.get_property_bool("pause") == false,
+        " (expected " .. tostring(saved.target) .. ")")
+    check("clicking does not pause playback", mp.get_property_bool("pause") == false,
         "pause=" .. tostring(mp.get_property("pause")))
     local n = info()
     local cur = (mp.get_property_number("playlist-pos") or 0) + 1
-    check("재생 중인 항목이 화면 안에 보인다", cur > n.scroll and cur <= n.scroll + n.vis,
+    check("the playing row is on screen", cur > n.scroll and cur <= n.scroll + n.vis,
         "scroll=" .. tostring(n.scroll))
 end)
 
--- 습관적으로 두 번 누르는 사람: 보던 게 처음부터 다시 시작되면 안 된다
+-- Someone who always double clicks must not lose their place
 step(0.5, function()
     saved.loads = loads
     local n = info()
@@ -161,34 +175,34 @@ step(0.5, function()
 end)
 
 step(0.8, function()
-    check("재생 중인 항목을 두 번 눌러도 다시 시작되지 않는다", loads == saved.loads,
-        "파일 읽기 " .. tostring(loads - saved.loads) .. "회 더 발생")
-    check("두 번 클릭이 일시정지로 새지 않는다", mp.get_property_bool("pause") == false,
+    check("clicking the playing row again does not restart it", loads == saved.loads,
+        "loaded " .. tostring(loads - saved.loads) .. " more times")
+    check("a double click does not leak into play/pause", mp.get_property_bool("pause") == false,
         "pause=" .. tostring(mp.get_property("pause")))
 end)
 
--- ── 3. 커서 아래 줄 강조 ────────────────────────────────────────────
+-- ── 3. highlighting the row under the cursor ────────────────────────
 step(0.3, function()
-    log("[3] 강조 표시")
+    log("[3] highlight")
     local x, y = row_xy(5)
     mouse(x, y)
 end)
 
 step(0.4, function()
-    check("커서를 올리면 그 줄이 강조된다",
+    check("hovering highlights that row",
         tostring(info().hover):match("^panel/row%d+") ~= nil, tostring(info().hover))
     local n = info()
     wheel(n.x0 + n.width / 2, select(2, row_xy(5)), -1, 3)
 end)
 
 step(0.5, function()
-    check("휠을 굴린 뒤에도 커서 아래 줄이 강조된다",
+    check("after a scroll the row under the cursor is highlighted",
         tostring(info().hover):match("^panel/row%d+") ~= nil, tostring(info().hover))
 end)
 
--- ── 4. 패널 너비 자유 조절 ──────────────────────────────────────────
+-- ── 4. resizing the panel freely ────────────────────────────────────
 step(0.3, function()
-    log("[4] 너비 드래그")
+    log("[4] width drag")
     saved.w0 = info().width
 end)
 
@@ -201,7 +215,7 @@ drag_steps(function()
 end)
 
 step(0.4, function()
-    check("끈 만큼 넓어진다", math.abs(info().width - (saved.w0 + 200)) <= 8,
+    check("it widens by what you dragged", math.abs(info().width - (saved.w0 + 200)) <= 8,
         "width=" .. tostring(info().width))
     saved.w1 = info().width
 end)
@@ -212,7 +226,7 @@ drag_steps(function()
 end)
 
 step(0.4, function()
-    check("반대로 끌면 좁아진다", math.abs(info().width - (saved.w1 - 130)) <= 8,
+    check("dragging back narrows it", math.abs(info().width - (saved.w1 - 130)) <= 8,
         "width=" .. tostring(info().width))
 end)
 
@@ -223,19 +237,19 @@ end)
 
 step(0.4, function()
     local n = info()
-    check("창 밖까지 끌어도 영상 자리가 남는다", n.width <= n.ow - 150,
+    check("video keeps a slice when dragged off-screen", n.width <= n.ow - 150,
         "width=" .. tostring(n.width) .. " ow=" .. tostring(n.ow))
     saved.w2 = n.width
     click(n.x0, n.oh / 2)
 end)
 
 step(0.5, function()
-    check("가장자리를 그냥 누르면 정해진 너비로 바뀐다", info().width ~= saved.w2,
+    check("a plain click on the edge jumps to a preset width", info().width ~= saved.w2,
         "width=" .. tostring(info().width))
 end)
 
--- ── 5. 스크롤바 끌기 ────────────────────────────────────────────────
-step(0.3, function() log("[5] 스크롤바") end)
+-- ── 5. dragging the scrollbar ───────────────────────────────────────
+step(0.3, function() log("[5] scrollbar") end)
 
 drag_steps(function()
     local n = info()
@@ -248,30 +262,30 @@ end)
 
 step(0.4, function()
     local n = info()
-    check("스크롤바를 끝까지 끌면 목록 맨 아래", n.scroll == n.max_scroll,
+    check("dragging it to the end reaches the last row", n.scroll == n.max_scroll,
         "scroll=" .. tostring(n.scroll) .. "/" .. tostring(n.max_scroll))
 end)
 
--- ── 6. 탭 전환 ──────────────────────────────────────────────────────
+-- ── 6. switching tabs ───────────────────────────────────────────────
 step(0.3, function()
-    log("[6] 탭")
+    log("[6] tabs")
     local n = info()
     local count = n.tabs or 6
     local tw = (n.width - 12 * n.scale) / count
     saved.tabx = {}
     for i = 1, count do saved.tabx[i] = n.x0 + 6 * n.scale + (i - 0.5) * tw end
     saved.taby = 16 * n.scale
-    click(saved.tabx[2], saved.taby) -- 오디오
+    click(saved.tabx[2], saved.taby) -- audio
 end)
 
 step(0.4, function()
-    check("오디오 탭으로 바뀐다", info().tab == "audio", tostring(info().tab))
-    click(saved.tabx[5], saved.taby) -- 챕터
+    check("the audio tab opens", info().tab == "audio", tostring(info().tab))
+    click(saved.tabx[5], saved.taby) -- chapters
 end)
 
 step(0.4, function()
-    check("챕터 탭으로 바뀐다", info().tab == "chapter", tostring(info().tab))
-    -- 항목이 없는 탭에서 빈 곳을 눌러본다
+    check("the chapters tab opens", info().tab == "chapter", tostring(info().tab))
+    -- press empty space on a tab with no rows
     local n = info()
     saved.paused = mp.get_property_bool("pause")
     click(n.x0 + n.width / 2, n.oh * 0.6)
@@ -279,21 +293,21 @@ step(0.4, function()
 end)
 
 step(0.5, function()
-    check("패널 빈 곳을 눌러도 영상이 멈추지 않는다",
+    check("clicking empty panel space does not pause",
         mp.get_property_bool("pause") == saved.paused, "pause=" .. tostring(mp.get_property("pause")))
-    click(saved.tabx[(info().tabs or 6)], saved.taby) -- 색감(마지막 탭)
+    click(saved.tabx[(info().tabs or 6)], saved.taby) -- colour, the last tab
 end)
 
 step(0.4, function()
-    check("색감 탭으로 바뀐다", info().tab == "color", tostring(info().tab))
+    check("the colour tab opens", info().tab == "color", tostring(info().tab))
     mp.set_property_number("brightness", 0)
 end)
 
--- ── 7. 색감 슬라이더 ────────────────────────────────────────────────
+-- ── 7. colour sliders ───────────────────────────────────────────────
 drag_steps(function()
     local n = info()
     local s = n.scale
-    local by = (34 * s + 6 * s) + 6 * s + 40 * s + 22 * s -- 첫 슬라이더 막대
+    local by = (34 * s + 6 * s) + 6 * s + 40 * s + 22 * s -- the first slider
     return {
         from = { n.x0 + n.width * 0.5, by },
         points = { { n.x0 + n.width * 0.7, by }, { n.x0 + n.width * 0.85, by } },
@@ -301,39 +315,39 @@ drag_steps(function()
 end)
 
 step(0.4, function()
-    log("[7] 색감 슬라이더")
-    check("슬라이더를 끌면 밝기가 올라간다", (mp.get_property_number("brightness") or 0) > 10,
+    log("[7] colour slider")
+    check("dragging the slider raises brightness", (mp.get_property_number("brightness") or 0) > 10,
         "brightness=" .. tostring(mp.get_property_number("brightness")))
     mp.set_property_number("brightness", 0)
     mp.commandv("script-message", "boda-panel", "pl")
 end)
 
--- ── 8. 창 끌기 방지 ─────────────────────────────────────────────────
+-- ── 8. window dragging ──────────────────────────────────────────────
 step(0.4, function()
-    log("[8] 창 끌기")
+    log("[8] window dragging")
     local n = info()
     mouse(n.x0 + n.width / 2, n.oh / 2)
 end)
 
 step(0.4, function()
-    check("패널 위에서는 창 끌기가 꺼진다", mp.get_property_bool("window-dragging") == false,
+    check("it is off over the panel", mp.get_property_bool("window-dragging") == false,
         tostring(mp.get_property("window-dragging")))
     mouse(40, 200)
 end)
 
 step(0.4, function()
-    check("영상 위에서는 창 끌기가 살아난다", mp.get_property_bool("window-dragging") == true,
+    check("it is back over the video", mp.get_property_bool("window-dragging") == true,
         tostring(mp.get_property("window-dragging")))
 end)
 
--- ── 9. 정렬 ─────────────────────────────────────────────────────────
+-- ── 9. sorting ──────────────────────────────────────────────────────
 step(0.3, function()
-    log("[9] 정렬")
+    log("[9] sorting")
     local n = info()
-    local bw = (n.width - 20 * n.scale) / 6 -- 정렬 칸은 6개(기본/이름/크기/화질/길이/날짜)
+    local bw = (n.width - 20 * n.scale) / 6 -- six sort buttons
     saved.sortx = {}
     for i = 1, 6 do saved.sortx[i] = n.x0 + 10 * n.scale + (i - 0.5) * bw end
-    click(saved.sortx[2], n.sort_top + 10 * n.scale) -- 이름
+    click(saved.sortx[2], n.sort_top + 10 * n.scale) -- by name
 end)
 
 step(0.8, function()
@@ -342,11 +356,11 @@ step(0.8, function()
     for i = 2, #pl do
         if basename(pl[i - 1].filename) > basename(pl[i].filename) then sorted = false break end
     end
-    check("이름 정렬이 순서대로 된다", sorted, basename(pl[1] and pl[1].filename))
+    check("sorting by name orders the list", sorted, basename(pl[1] and pl[1].filename))
     local cur = (mp.get_property_number("playlist-pos") or 0) + 1
-    check("정렬해도 보던 파일이 그대로 현재 항목이다", pl[cur] and pl[cur].current == true,
+    check("the playing file stays current after sorting", pl[cur] and pl[cur].current == true,
         "pos=" .. tostring(cur - 1))
-    click(saved.sortx[2], info().sort_top + 10 * info().scale) -- 다시 = 역순
+    click(saved.sortx[2], info().sort_top + 10 * info().scale) -- again = reversed
 end)
 
 step(0.8, function()
@@ -355,24 +369,24 @@ step(0.8, function()
     for i = 2, #pl do
         if basename(pl[i - 1].filename) < basename(pl[i].filename) then desc = false break end
     end
-    check("같은 정렬 버튼을 다시 누르면 역순", desc, basename(pl[1] and pl[1].filename))
+    check("pressing the same button reverses it", desc, basename(pl[1] and pl[1].filename))
 end)
 
--- ── 10. 영상 위 휠은 음량 ───────────────────────────────────────────
+-- ── 10. the wheel over the video ────────────────────────────────────
 step(0.3, function()
-    log("[10] 영상 위 휠")
+    log("[10] wheel over the video")
     saved.vol = mp.get_property_number("volume")
     wheel(60, 200, 1, 2)
 end)
 
 step(0.5, function()
     local v = mp.get_property_number("volume")
-    check("영상 위에서 휠은 음량", v and saved.vol and v > saved.vol, "volume=" .. tostring(v))
+    check("it changes volume", v and saved.vol and v > saved.vol, "volume=" .. tostring(v))
 end)
 
--- ── 11. 패널이 열려 있어도 탐색바가 눌린다 ──────────────────────────
+-- ── 11. the seek bar with the panel open ────────────────────────────
 step(0.3, function()
-    log("[11] 탐색바")
+    log("[11] seek bar")
     local n = info()
     mouse(n.x0 / 2, n.oh - 30)
 end)
@@ -384,14 +398,14 @@ step(0.5, function()
 end)
 
 step(0.6, function()
-    check("탐색바 재생 버튼이 패널에 가려지지 않는다",
+    check("its play button is not blocked by the panel",
         mp.get_property_bool("pause") ~= saved.paused2, "pause=" .. tostring(mp.get_property("pause")))
     mp.set_property_bool("pause", false)
 end)
 
--- ── 12. 즐겨찾기 구간 ───────────────────────────────────────────────
+-- ── 12. saved clips ─────────────────────────────────────────────────
 step(0.3, function()
-    log("[12] 즐겨찾기 구간")
+    log("[12] saved clips")
     mp.set_property_bool("pause", true)
     local dur = mp.get_property_number("duration") or 10
     saved.fav_a = dur * 0.25
@@ -407,8 +421,8 @@ step(0.4, function() mp.commandv("script-message", "boda-panel", "fav") end)
 
 step(0.7, function()
     local n = info()
-    check("즐겨찾기 탭이 열린다", n.tab == "fav", tostring(n.tab))
-    check("[ 와 ] 로 정한 구간이 목록에 담긴다", n.rows == 1, "rows=" .. tostring(n.rows))
+    check("the clips tab opens", n.tab == "fav", tostring(n.tab))
+    check("the range set with [ and ] is saved", n.rows == 1, "rows=" .. tostring(n.rows))
     mp.commandv("seek", 0, "absolute")
 end)
 
@@ -419,8 +433,8 @@ end)
 
 step(0.7, function()
     local t = mp.get_property_number("time-pos") or -1
-    check("항목을 누르면 구간 시작으로 이동한다", math.abs(t - saved.fav_a) < 1.0,
-        string.format("time-pos=%.1f (기대 %.1f)", t, saved.fav_a))
+    check("clicking a clip plays from its start", math.abs(t - saved.fav_a) < 1.0,
+        string.format("time-pos=%.1f (expected %.1f)", t, saved.fav_a))
     mp.set_property("ab-loop-a", "no")
     mp.set_property("ab-loop-b", "no")
 end)
@@ -428,69 +442,81 @@ end)
 step(0.4, function()
     local n = info()
     local _, y = row_xy(1)
-    click(n.x0 + n.width - 32 * n.scale, y) -- 반복 버튼
+    click(n.x0 + n.width - 32 * n.scale, y) -- loop button
 end)
 
 step(0.7, function()
     local a = tonumber(mp.get_property("ab-loop-a"))
     local b = tonumber(mp.get_property("ab-loop-b"))
-    check("반복 버튼이 그 구간을 A-B 반복으로 건다",
+    check("the loop button sets the A-B loop",
         a ~= nil and b ~= nil and math.abs(a - saved.fav_a) < 1 and math.abs(b - saved.fav_b) < 1,
-        string.format("a=%s b=%s (기대 %.1f/%.1f)", tostring(a), tostring(b),
+        string.format("a=%s b=%s (expected %.1f/%.1f)", tostring(a), tostring(b),
             saved.fav_a or -1, saved.fav_b or -1))
     local n = info()
     local _, y = row_xy(1)
-    click(n.x0 + n.width - 14 * n.scale, y) -- × 버튼
+    click(n.x0 + n.width - 14 * n.scale, y) -- the × button
 end)
 
 step(0.7, function()
-    check("× 를 누르면 목록에서 지워진다", info().rows == 0, "rows=" .. tostring(info().rows))
+    check("× removes it from the list", info().rows == 0, "rows=" .. tostring(info().rows))
     mp.set_property("ab-loop-a", "no")
     mp.set_property("ab-loop-b", "no")
     mp.commandv("script-message", "boda-panel", "pl")
     mp.set_property_bool("pause", false)
 end)
 
--- ── 13. 창 크기 변화 ────────────────────────────────────────────────
+-- ── 13. changing the window size ────────────────────────────────────
 step(0.3, function()
-    log("[13] 전체화면")
+    log("[13] fullscreen")
     saved.width_before = info().width
     mp.set_property_bool("fullscreen", true)
 end)
 
 step(1.2, function()
     local n = info()
-    check("전체화면에서도 패널이 유지된다", n.open == true, tostring(n.open))
-    check("전체화면 폭에 맞춰 다시 계산된다", n.x0 + n.width == n.ow,
+    check("the panel survives fullscreen", n.open == true, tostring(n.open))
+    check("it is laid out for the new width", n.x0 + n.width == n.ow,
         string.format("x0=%s w=%s ow=%s", tostring(n.x0), tostring(n.width), tostring(n.ow)))
     mp.set_property_bool("fullscreen", false)
 end)
 
 step(1.2, function()
-    check("창으로 돌아와도 너비가 유지된다",
+    check("the width is kept coming back",
         math.abs((info().width or 0) - (saved.width_before or 0)) <= 8, tostring(info().width))
 end)
 
--- ── 14. 키보드 토글과 정지 ──────────────────────────────────────────
+-- ── 14. keyboard toggle and stop ────────────────────────────────────
 step(0.3, function()
-    log("[14] F6 토글과 정지")
+    log("[14] F6 toggle and stop")
     mp.commandv("keypress", "F6")
 end)
 
 step(0.5, function()
-    check("F6 으로 닫힌다", info().open ~= true, tostring(info().open))
+    check("F6 closes it", info().open ~= true, tostring(info().open))
     mp.commandv("keypress", "F6")
 end)
 
 step(0.5, function()
-    check("F6 으로 다시 열린다", info().open == true, tostring(info().open))
-    check("여백이 정상으로 돌아온다", (mp.get_property_number("video-margin-ratio-right") or 0) > 0.05,
+    check("F6 opens it again", info().open == true, tostring(info().open))
+    check("the video margin comes back", (mp.get_property_number("video-margin-ratio-right") or 0) > 0.05,
         tostring(mp.get_property("video-margin-ratio-right")))
     mp.command("stop")
 end)
 
 step(1.2, function()
-    check("정지하면 패널이 대기 화면을 가리지 않는다", info().open ~= true, tostring(info().open))
+    check("stopping hands the screen to the idle view", info().open ~= true, tostring(info().open))
+    local n = idle_info()
+    check("the idle screen comes up", n.active == true, tostring(n.active))
+    check("it lists what was watched", (n.rows or 0) > 0 and (n.shown or 0) > 0,
+        string.format("rows=%s shown=%s", tostring(n.rows), tostring(n.shown)))
+end)
+
+-- A draw that throws is swallowed so one bad screen cannot kill the script, so
+-- the count is checked here instead: a silently blank screen is still a failure.
+step(0.4, function()
+    local e = errors()
+    check("nothing threw while drawing", (e.count or 0) == 0,
+        string.format("%s errors, last: %s", tostring(e.count), tostring(e.last)))
 end)
 
 mp.register_event("file-loaded", function()

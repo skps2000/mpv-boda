@@ -1,4 +1,4 @@
--- 아래쪽 탐색바 + 제목 + 버튼. 창 크기에 따라 배율과 글자를 맞춘다.
+-- Bottom seek bar with the title and buttons; scales with the window.
 local mp = require("mp")
 local util = require("lib.util")
 local ui = require("lib.ui")
@@ -29,15 +29,15 @@ local function geom()
     return x0, w, oh - 46 * s, s, ow - right, oh
 end
 
--- ── 썸네일 ──────────────────────────────────────────────────────────
+-- ── thumbnails ─────────────────────────────────────────────────────
 local function hide_thumb()
     if not thumb_shown then return end
     mp.command_native({ "overlay-remove", thumb_id })
     thumb_shown = false
 end
 
--- 미리보기 그림이 놓일 자리. 시간 표시를 가리지 않도록 위로 띄우고,
--- 창 밖으로 나가지 않게 좌우를 잡아둔다.
+-- Where the preview sits: lifted above the time label so it does not cover it,
+-- and clamped left and right so it never leaves the window.
 local function thumb_pos()
     local x0, bw, y0, s, vw = geom()
     local dur = mp.get_property_number("duration") or 0
@@ -76,12 +76,12 @@ local function make_thumb()
         if hover_time and visible then
             show_thumb()
             M.draw()
-            make_thumb() -- 그 사이 마우스가 움직였으면 한 번 더
+            make_thumb() -- run again if the cursor moved meanwhile
         end
     end)
 end
 
--- 프로세스를 띄우지 않고 파일만 확인한다 (없을 때 로그에 에러가 찍히지 않도록).
+-- Look for the file instead of running it, so a missing ffmpeg logs no error.
 local function find_ffmpeg()
     if not opts.thumbnails then return end
     local cands = {}
@@ -99,8 +99,8 @@ local function find_ffmpeg()
     end
 end
 
--- ── 그리기 ──────────────────────────────────────────────────────────
-local draw -- 아래에서 ui.guard 로 감싼다
+-- ── drawing ───────────────────────────────────────────────────────
+local draw -- wrapped with ui.guard below
 local function draw_impl()
     if not visible or not mp.get_property("path") or not ui.ready() then
         layer:hide()
@@ -119,7 +119,7 @@ local function draw_impl()
     local vol = mp.get_property_number("volume") or 0
     local vmax = mp.get_property_number("volume-max") or 130
 
-    -- 위/아래 그라데이션
+    -- top and bottom scrims
     local bar_h = 74 * s
     local top_h = 52 * s
     for i = 0, 7 do
@@ -132,7 +132,7 @@ local function draw_impl()
     local title = mp.get_property("media-title") or ""
     layer:text_fit(20 * s, 13 * s, 16 * s, t.text, 7, title, vw - 40 * s)
 
-    -- 진행 막대 (밝은 영상 위에서도 보이도록 흰색 반투명)
+    -- progress bar, translucent white so it reads over bright video
     local thick = (hover_time and 5 or 3) * s
     layer:rect(x0, y0, bw, thick, t.text, 120)
     local played = util.clamp(bw * (pos / dur), 0, bw)
@@ -156,7 +156,7 @@ local function draw_impl()
         local label = util.fmt_time(hover_time)
         local lw = util.text_width(label, 12 * s) + 14 * s
         local lx = util.clamp(hx - lw / 2, x0, x0 + bw - lw)
-        -- 미리보기 그림 뒤에 깔리는 테두리 (그림 자체는 overlay-add 로 그려진다)
+        -- border behind the preview (the image itself comes from overlay-add)
         if thumb_shown then
             local tx, ty = thumb_pos()
             if tx then layer:rect(tx - 2 * s, ty - 2 * s, TW + 4 * s, TH + 4 * s, "000000", 210) end
@@ -177,7 +177,7 @@ local function draw_impl()
         end,
     })
 
-    -- 버튼 줄
+    -- button row
     local iy = oh - 30 * s
     local isz = 16 * s
     local x = x0
@@ -226,7 +226,7 @@ local function draw_impl()
     local clock = util.fmt_time(pos) .. " / " .. util.fmt_time(dur)
     layer:text(x, iy - 7 * s, 13 * s, t.text, 7, clock)
 
-    -- 오른쪽 버튼
+    -- buttons on the right
     local rx = vw - 20 * s
     local function rbutton(id, path, w, on_click, dim)
         rx = rx - w
@@ -245,7 +245,7 @@ local function draw_impl()
         mp.command("cycle sub-visibility")
     end, not subs_on)
 
-    -- 일시정지 중에는 가운데에 큰 재생 버튼
+    -- big play button in the middle while paused
     if paused then
         local c = 34 * s
         layer:rect(vw / 2 - c, oh / 2 - c, c * 2, c * 2, "000000", 110)
@@ -257,10 +257,10 @@ local function draw_impl()
     layer:flush()
 end
 
-draw = ui.guard("탐색바", draw_impl)
+draw = ui.guard("seek bar", draw_impl)
 M.draw = draw
 
--- ── 표시/숨김 ───────────────────────────────────────────────────────
+-- ── show and hide ─────────────────────────────────────────────────
 local function cancel_hide()
     if hide_timer then
         hide_timer:kill()
@@ -358,7 +358,7 @@ function M.init()
         draw()
     end)
 
-    -- 키로도 부를 수 있게
+    -- reachable from a key as well
     mp.add_key_binding(nil, "osd-toggle", function()
         visible = not visible
         if visible then schedule_hide() end
