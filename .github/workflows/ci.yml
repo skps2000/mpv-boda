@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  luacheck:
+    name: Lua 문법 검사
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: luacheck 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 luarocks
+          sudo luarocks install luacheck
+
+      - name: 검사
+        run: luacheck scripts
+
+  config:
+    name: 설정 파일 검사
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: input.conf 중복 키 확인
+        run: |
+          dup=$(awk '/^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+                     { if (seen[$1]) print $1; else seen[$1]=1 }' input.conf)
+          if [ -n "$dup" ]; then
+            echo "같은 키가 두 번 정의됨:"; echo "$dup"; exit 1
+          fi
+
+      - name: mpv.conf 따옴표 확인
+        run: |
+          # 값이 # 나 % 로 시작하면 따옴표가 있어야 한다 (없으면 mpv 가 그 줄을 버린다)
+          bad=$(grep -nE '^[a-z0-9-]+=[#%]' mpv.conf || true)
+          if [ -n "$bad" ]; then
+            echo "따옴표가 필요한 값:"; echo "$bad"; exit 1
+          fi
+
+      - name: input.conf 가 부르는 동작이 실제로 있는지 확인
+        run: |
+          grep -o 'script-binding boda/[a-z0-9-]*' input.conf | sed 's|.*boda/||' | sort -u > used.txt
+          { grep -ohE 'add_key_binding\(nil, "[a-z0-9-]+"' -r scripts/boda | sed 's/.*"\(.*\)"/\1/'
+            grep -ohE '\b(action|vf_action|af_action)\("[a-z0-9-]+"' -r scripts/boda | sed 's/.*"\(.*\)"/\1/'
+            printf 'panel-pl\npanel-audio\npanel-sub\npanel-video\npanel-chapter\npanel-color\n'
+            for i in $(seq 0 9); do echo "digit-$i"; done
+            printf 'mark-intro\nmark-outro\n'
+          } | sort -u > registered.txt
+          missing=$(comm -23 used.txt registered.txt)
+          if [ -n "$missing" ]; then
+            echo "input.conf 가 부르는데 스크립트에 없는 동작:"; echo "$missing"; exit 1
+          fi

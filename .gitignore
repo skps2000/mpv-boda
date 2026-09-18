@@ -11,6 +11,8 @@
 !input.conf
 !script-opts/*.conf
 !scripts/**/*.lua
+!docs/images/*.png
+!.github/workflows/*.yml
 
 # 안전장치: 아래 규칙이 위 허용보다 우선한다 (개인 기록은 어떤 경우에도 커밋 금지).
 # 설정 폴더 바로 아래만 막는다. 앞의 / 를 빼면 scripts/boda/mod/history.lua 까지 걸린다.
