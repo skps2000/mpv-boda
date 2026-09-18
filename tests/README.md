@@ -51,9 +51,11 @@ Select-String -Path "$env:TEMP\boda-test.log" -Pattern '\] T ' |
 실제로 메뉴를 띄우면(`context-menu`) 사용자가 닫을 때까지 멈추므로, 트리를 만드는 데까지만 봅니다.
 
 ```powershell
-mpv --script-opts=boda-state_dir=$env:TEMPoda-test `
-    --script="$env:APPDATA\mpv	ests\menu.lua" `
-    --log-file="$env:TEMPoda-menu.log" "D:\영상폴더\첫파일.mkv"
+$tmp = "$env:TEMP\boda-test"
+mpv --script-opts=boda-state_dir=$tmp `
+    --script="$env:APPDATA\mpv\tests\menu.lua" `
+    --log-file="$env:TEMP\boda-menu.log" `
+    "D:\영상폴더\첫파일.mkv"
 ```
 
 메뉴 구성 설정까지 보려면 (쉼표가 들어가므로 `%길이%` 로 감싼다):

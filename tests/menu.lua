@@ -92,12 +92,10 @@ end
 local function validate(items, path, problems)
     for _, it in ipairs(items or {}) do
         local where = (path or "") .. "/" .. tostring(it.title or it.type)
-        if it.type == "separator" then
-            -- 구분선은 확인할 것이 없다
-        elseif it.type == "submenu" then
+        if it.type == "submenu" then
             if #(it.submenu or {}) == 0 then problems[#problems + 1] = where .. " (빈 하위메뉴)" end
             validate(it.submenu, where, problems)
-        else
+        elseif it.type ~= "separator" then -- 구분선은 확인할 것이 없다
             local disabled = has_state(it, "disabled")
             if (not it.cmd or it.cmd == "") and not disabled then
                 problems[#problems + 1] = where .. " (명령 없음)"
