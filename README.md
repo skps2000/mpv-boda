@@ -101,8 +101,15 @@ prefs.json       패널 너비, 정렬, 색보정 설정
 
 ## 문제가 생기면
 
-**탐색바 미리보기가 안 나와요** — `ffmpeg.exe`가 필요합니다. mpv 설치 폴더에 두거나 PATH에 넣으세요.
-직접 지정하려면 `script-opts\boda.conf` 의 `ffmpeg=` 에 경로를 적으면 됩니다.
+**탐색바 미리보기가 안 나와요** — `ffmpeg`가 필요합니다. 둘 중 하나로 설치한 뒤 mpv를 다시 실행하세요.
+
+```powershell
+scoop install ffmpeg
+winget install Gyan.FFmpeg
+```
+
+PATH에 없어도 됩니다. mpv 설치 폴더에 `ffmpeg.exe`를 두거나,
+`script-opts\boda.conf` 의 `ffmpeg=` 에 경로를 직접 적어도 됩니다.
 
 **키가 안 먹혀요** — `input.conf`에서 `Shift+글자`는 대문자로 적어야 합니다 (`Shift+n` ❌ → `N` ⭕).
 어떤 키가 무엇에 연결됐는지는 mpv에서 `?`(도움말) 또는 `Ctrl+F1`(통계)로 확인할 수 있습니다.

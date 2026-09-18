@@ -36,8 +36,21 @@ local function hide_thumb()
     thumb_shown = false
 end
 
-local function show_thumb(x, y)
+-- 미리보기 그림이 놓일 자리. 시간 표시를 가리지 않도록 위로 띄우고,
+-- 창 밖으로 나가지 않게 좌우를 잡아둔다.
+local function thumb_pos()
+    local x0, bw, y0, s, vw = geom()
+    local dur = mp.get_property_number("duration") or 0
+    if not hover_time or dur <= 0 then return nil end
+    local bx = x0 + bw * util.clamp(hover_time / dur, 0, 1)
+    local x = util.clamp(bx - TW / 2, 8 * s, math.max(8 * s, vw - TW - 8 * s))
+    return x, y0 - TH - 34 * s
+end
+
+local function show_thumb()
     if not util.exists(thumb_path) then return end
+    local x, y = thumb_pos()
+    if not x then return end
     mp.command_native({ "overlay-add", thumb_id, math.floor(x), math.floor(y),
         thumb_path, 0, "bgra", TW, TH, TW * 4 })
     thumb_shown = true
@@ -61,10 +74,8 @@ local function make_thumb()
     }, function()
         thumb_busy = false
         if hover_time and visible then
-            local x0, w, y0 = geom()
-            local dur = mp.get_property_number("duration") or 1
-            local bx = x0 + w * util.clamp(hover_time / dur, 0, 1)
-            show_thumb(bx - TW / 2, y0 - TH - 16)
+            show_thumb()
+            M.draw()
             make_thumb() -- 그 사이 마우스가 움직였으면 한 번 더
         end
     end)
@@ -143,10 +154,15 @@ local function draw_impl()
     if hover_time then
         local hx = x0 + bw * util.clamp(hover_time / dur, 0, 1)
         local label = util.fmt_time(hover_time)
-        local lw = util.text_width(label, 12 * s) + 12 * s
+        local lw = util.text_width(label, 12 * s) + 14 * s
         local lx = util.clamp(hx - lw / 2, x0, x0 + bw - lw)
-        layer:rect(lx, y0 - 30 * s, lw, 20 * s, "000000", 190)
-        layer:text(lx + lw / 2, y0 - 28 * s, 12 * s, t.text, 8, label)
+        -- 미리보기 그림 뒤에 깔리는 테두리 (그림 자체는 overlay-add 로 그려진다)
+        if thumb_shown then
+            local tx, ty = thumb_pos()
+            if tx then layer:rect(tx - 2 * s, ty - 2 * s, TW + 4 * s, TH + 4 * s, "000000", 210) end
+        end
+        layer:rect(lx, y0 - 28 * s, lw, 20 * s, "000000", 200)
+        layer:text(lx + lw / 2, y0 - 26 * s, 12 * s, t.text, 8, label)
     end
 
     layer:hit(x0 - 4 * s, y0 - 12 * s, bw + 8 * s, 24 * s, {
@@ -294,10 +310,7 @@ function M.init()
             if ffmpeg then
                 thumb_want = hover_time
                 make_thumb()
-                if util.exists(thumb_path) and thumb_last >= 0 then
-                    local bx = x0 + bw * (hover_time / dur)
-                    show_thumb(bx - TW / 2, y0 - TH - 16)
-                end
+                if thumb_last >= 0 then show_thumb() end
             end
         else
             if hover_time then
