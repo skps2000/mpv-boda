@@ -122,7 +122,7 @@ local function apply_sort()
     local rows = {}
     for i, e in ipairs(pl) do
         local path = e.filename or ""
-        local name = (e.title or util.basename(path))
+        local name = util.entry_name(e)
         local m = meta_of(path)
         local value
         if key == "size" then value = m.size
@@ -256,10 +256,10 @@ local function playlist_rows()
     for i, e in ipairs(mp.get_property_native("playlist") or {}) do
         local idx = i - 1
         local path = e.filename or ""
-        -- One click plays the row.
-        -- Clicking the row that is already playing does not restart it, so a habitual
+        -- One click plays the row. Clicking the row that is already playing does
+        -- not restart it, so a second click cannot lose your place.
         rows[#rows + 1] = {
-            text = e.title or util.basename(path),
+            text = util.entry_name(e),
             path = path,
             current = e.current,
             selected = (selected == idx),

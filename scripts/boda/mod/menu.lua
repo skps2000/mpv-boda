@@ -116,7 +116,7 @@ local function playlist_items()
     local items = {}
     for i = first, last do
         local e = pl[i]
-        items[#items + 1] = item(util.basename(e.title or e.filename),
+        items[#items + 1] = item(util.entry_name(e),
             "playlist-play-index " .. (i - 1), { checked = e.current })
     end
     if #pl > last then
@@ -474,7 +474,7 @@ end
 local function playlist_menu(index)
     local pl = mp.get_property_native("playlist") or {}
     local e = pl[index + 1]
-    local name = e and util.basename(e.title or e.filename) or t("menu_items")
+    local name = e and util.entry_name(e) or t("menu_items")
     return {
         item(name, "", { disabled = true }),
         SEP,

@@ -93,6 +93,10 @@ local function run_next()
     mp.add_timeout(s.delay, run_next)
 end
 
+-- Short test clips would otherwise roll over to the next file in the middle of a
+-- check, and every timing below would be measured against a different file.
+step(0.2, function() mp.set_property("loop-file", "inf") end)
+
 -- ── 1. scrolling the list while playing ─────────────────────────────
 step(0.6, function()
     log("[1] scrolling while playing")
@@ -124,8 +128,6 @@ step(1.5, function()
         "scroll=" .. tostring(info().scroll))
 end)
 
--- Paused from here: the list re-centres on the playing row when the file
--- changes, and with short test clips that lands right on top of this check.
 step(0.3, function() mp.set_property_bool("pause", true) end)
 
 step(0.3, function()
@@ -240,6 +242,13 @@ step(0.4, function()
     check("video keeps a slice when dragged off-screen", n.width <= n.ow - 150,
         "width=" .. tostring(n.width) .. " ow=" .. tostring(n.ow))
     saved.w2 = n.width
+    -- the pointer is off-screen after that drag: put it on the edge and let the
+    -- panel see it there before clicking, the way a hand would
+    mouse(n.x0, n.oh / 2)
+end)
+
+step(0.3, function()
+    local n = info()
     click(n.x0, n.oh / 2)
 end)
 

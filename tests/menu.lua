@@ -53,6 +53,10 @@ local function meta() return mp.get_property_native("user-data/boda/menu") or {}
 local function tree() return meta().tree or {} end
 
 -- find an entry by title, submenus included
+local function basename(path)
+    return tostring(path):match("[^/\\]+$") or tostring(path)
+end
+
 local function find(items, title)
     for _, it in ipairs(items or {}) do
         if it.title == title then return it end
@@ -104,6 +108,10 @@ local function validate(items, path, problems)
     end
 end
 
+-- Short test clips would otherwise roll over to the next file mid-run, changing
+-- the playlist position the menu is built around.
+step(0.2, function() mp.set_property("loop-file", "inf") end)
+
 -- ── stage 1: the tree and its state ─────────────────────────────────
 step(0.8, function()
     log("[stage 1] menu tree")
@@ -132,6 +140,26 @@ step(0.6, function()
     local problems = {}
     validate(t, "", problems)
     check("no empty commands or submenus", #problems == 0, table.concat(problems, " | "))
+
+    -- mpv fills a played entry's title in from the file's own metadata, so a row
+    -- must not be named after it: the list would rename itself as you watch.
+    local names = {}
+    for _, e in ipairs(mp.get_property_native("playlist") or {}) do
+        names[basename(e.filename or "")] = true
+    end
+    local odd, seen = {}, 0
+    local function walk(items)
+        for _, it in ipairs(items or {}) do
+            if it.cmd and it.cmd:find("playlist%-play%-index") and it.title then
+                seen = seen + 1
+                if not names[it.title] then odd[#odd + 1] = it.title end
+            end
+            if it.submenu then walk(it.submenu) end
+        end
+    end
+    walk(t)
+    check("playlist rows are named after the file", seen > 0 and #odd == 0,
+        string.format("%d rows, odd: %s", seen, table.concat(odd, " | ")))
 end)
 
 -- do check marks and disabled entries match reality

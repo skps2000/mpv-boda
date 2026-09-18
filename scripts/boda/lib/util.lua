@@ -131,6 +131,21 @@ function M.basename(path)
     return (file and file ~= "") and file or path
 end
 
+-- What to call a playlist entry.
+-- mpv fills an entry's title in from the file's own metadata once it has been
+-- played, so going by the title would rename a row the moment you pick it, and
+-- move it somewhere else under a name sort. On disk the filename is what the
+-- eye is looking for, so the title is only used where there is no filename to
+-- show: streams and URLs.
+function M.entry_name(entry)
+    if type(entry) ~= "table" then return "" end
+    local path = entry.filename or ""
+    if path ~= "" and not path:find("://", 1, true) then
+        return M.basename(path)
+    end
+    return entry.title or M.basename(path)
+end
+
 function M.dirname(path)
     if not path or path == "" then return nil end
     local dir = utils.split_path(path)

@@ -51,8 +51,9 @@ code 1.
 ## Menu tests
 
 `tests/menu.lua` builds the menu tree and checks its contents, its state and how it changes with
-context. Actually showing the menu (`context-menu`) blocks until someone dismisses it, so the
-tests stop at building the tree.
+context, including that playlist rows are named after the file rather than whatever title mpv
+reads out of it. Actually showing the menu (`context-menu`) blocks until someone dismisses it, so
+the tests stop at building the tree.
 
 ```powershell
 $tmp = "$env:TEMP\boda-test"
@@ -70,6 +71,7 @@ To cover the `menu_sections` setting too (it contains commas, so wrap it in `%le
 
 ## Notes
 
-- The cursor moves by itself while they run. Do not start them mid-task.
+- The cursor moves by itself while they run. Do not start them mid-task, and run one at a time:
+  a second mpv window takes the focus, and the clicks land in the wrong place.
 - Forget `--script-opts=boda-state_dir=` and **test files end up in your real history**.
 - Anything that writes files (recording, saving a playlist) is left untested.
