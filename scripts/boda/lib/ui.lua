@@ -11,8 +11,11 @@ local layers = {}     -- z 내림차순 (히트 테스트 순서)
 local mouse_subs = {}
 local hover_id = nil
 local drag = nil
+local press_region = nil
 local cursor_saved = nil
 local cursor_held = false
+local drag_allowed = nil -- 사용자가 설정한 window-dragging 값
+local drag_now = nil
 
 -- ── 색 ──────────────────────────────────────────────────────────────
 local function to_ass(rgb) -- #RRGGBB → ASS 의 BBGGRR
@@ -163,6 +166,10 @@ end
 
 M.region_at = region_at
 
+function M.hovered_id()
+    return hover_id
+end
+
 function M.mouse_pos()
     local m = mp.get_property_native("mouse-pos")
     if not m or not m.x then return nil end
@@ -198,6 +205,27 @@ local function set_hover(id, layer)
     if layer and layer ~= prev_layer then redraw(layer) end
 end
 
+-- ── 창 끌기 ─────────────────────────────────────────────────────────
+-- mpv 는 영상 위에서 왼쪽 버튼을 누르면 창을 움직인다(--window-dragging).
+-- UI 위에서는 이걸 꺼야 패널 너비 조절이나 슬라이더 끌기가 창 이동으로 새지 않는다.
+local function set_window_dragging(allow)
+    if drag_allowed == nil then
+        drag_allowed = mp.get_property_bool("window-dragging")
+        if drag_allowed == nil then drag_allowed = true end
+    end
+    if not drag_allowed then return end -- 사용자가 꺼둔 경우엔 건드리지 않는다
+    local want = allow and true or false
+    if want == drag_now then return end
+    drag_now = want
+    mp.set_property_bool("window-dragging", want)
+end
+
+-- 지금 커서 위치를 기준으로 다시 판단한다 (패널이 열리거나 다시 그려진 뒤).
+function M.update_dragging()
+    local x, y = M.mouse_pos()
+    set_window_dragging(not (drag or (x and region_at(x, y))))
+end
+
 -- ── 입력 ────────────────────────────────────────────────────────────
 function M.on_mouse(fn)
     mouse_subs[#mouse_subs + 1] = fn
@@ -214,20 +242,31 @@ function M.click(event)
     if not x then return end
     if event == "down" then
         local r = region_at(x, y)
-        if not r then return end
+        press_region = r
+        if not r then
+            set_window_dragging(true)
+            return
+        end
+        set_window_dragging(false)
         if r.drag or r.press then
             drag = { region = r, x0 = x, y0 = y, moved = false }
         end
         if r.press then r.press(x, y) end
     elseif event == "up" then
         local d = drag
-        drag = nil
+        local pressed = press_region
+        drag, press_region = nil, nil
         if d then
             if d.region.drag_end then d.region.drag_end(d.moved, x, y) end
-            if d.moved then return end
+            if d.moved then
+                M.update_dragging()
+                return
+            end
         end
+        -- 누른 곳과 뗀 곳이 같을 때만 클릭으로 친다.
         local r = region_at(x, y)
-        if r and r.click then r.click(x, y) end
+        if r and r.click and (not pressed or pressed.id == r.id) then r.click(x, y) end
+        M.update_dragging()
     end
 end
 
@@ -242,11 +281,15 @@ function M.double_click()
     return r ~= nil
 end
 
+local update_hover -- 아래 init 에서 채운다
+
 function M.wheel(dir)
     local x, y = M.mouse_pos()
     local r = region_at(x, y, "scroll")
     if r then
         r.scroll(dir)
+        -- 목록이 밀렸으니 커서 아래 항목이 바뀐다. 강조 표시를 다시 계산한다.
+        if update_hover then update_hover(x, y, true) end
         return true
     end
     return false
@@ -274,6 +317,17 @@ function M.init()
         end
     end)
 
+    update_hover = function(x, y, inside)
+        if inside == false then
+            set_hover(nil, nil)
+            set_window_dragging(true)
+            return
+        end
+        local r = region_at(x, y)
+        set_hover(r and r.id or nil, r and r.layer or nil)
+        set_window_dragging(not r)
+    end
+
     mp.observe_property("mouse-pos", "native", function(_, m)
         if not m or not m.x then return end
         local x, y = m.x, m.y
@@ -284,12 +338,7 @@ function M.init()
             if drag.region.drag then drag.region.drag(x, y) end
             return
         end
-        if m.hover == false then
-            set_hover(nil, nil)
-        else
-            local r = region_at(x, y)
-            set_hover(r and r.id or nil, r and r.layer or nil)
-        end
+        update_hover(x, y, m.hover)
         for _, fn in ipairs(mouse_subs) do
             local ok, err = pcall(fn, x, y, m.hover)
             if not ok then mp.msg.error("마우스 처리 실패: " .. tostring(err)) end

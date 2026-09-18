@@ -15,6 +15,14 @@ local tab = "pl"
 local scroll = 0
 local sorting = false
 local meta = {}
+local info = {} -- 지금 화면 상태. user-data/boda/panel 로 공개해 디버깅·테스트에 쓴다.
+local follow = true -- 재생 중인 항목을 화면 안으로 끌어올지 (사용자가 스크롤하면 끈다)
+local selected = nil -- 클릭으로 골라둔 재생목록 항목 (0부터). 재생은 더블클릭.
+local draw -- 아래에서 ui.guard 로 감싼다
+
+local function publish()
+    pcall(mp.set_property_native, "user-data/boda/panel", info)
+end
 
 local TABS = {
     { id = "pl", t = "목록" },
@@ -153,12 +161,15 @@ local function apply_sort()
 end
 
 -- ── 여백(영상 밀어내기) ─────────────────────────────────────────────
+local MIN_W, KEEP_VIDEO = 200, 160 -- 패널 최소 너비 / 영상에 남겨둘 최소 너비
+
 local function panel_width()
     local ow = select(1, ui.osd_size())
-    local w = state.prefs.panel_w
-    if not w or w < 200 then w = opts.panel_width end
-    if ow > 0 then w = math.min(w, math.floor(ow * 0.55)) end
-    return math.max(220, math.floor(w))
+    local w = tonumber(state.prefs.panel_w) or opts.panel_width
+    if ow > 0 then
+        w = math.min(w, math.max(MIN_W, ow - KEEP_VIDEO))
+    end
+    return math.max(MIN_W, math.floor(w))
 end
 
 local function apply_margin()
@@ -187,11 +198,19 @@ local function playlist_rows()
         elseif sort == "quality" and m.pixels > 0 then
             hint = string.format("%.1fMP", m.pixels / 1000000)
         end
+        -- 팟플레이어와 같게: 한 번 클릭은 고르기, 두 번 클릭이 재생.
+        -- (한 번 클릭으로 바로 재생하면 스크롤하다 잘못 눌러 보던 걸 놓친다)
         rows[#rows + 1] = {
             text = e.title or util.basename(path),
             hint = hint,
             current = e.current,
+            selected = (selected == idx),
             click = function()
+                selected = idx
+                draw()
+            end,
+            dbl = function()
+                selected = idx
                 mp.commandv("playlist-play-index", idx)
                 mp.set_property_bool("pause", false)
             end,
@@ -267,16 +286,19 @@ local function chapter_rows()
 end
 
 -- ── 그리기 ──────────────────────────────────────────────────────────
-local draw -- 아래에서 ui.guard 로 감싼다
 local function draw_impl()
-    if not open or not ui.ready() then
+    -- 파일이 없을 때는 대기 화면에 자리를 내준다.
+    if not open or not ui.ready() or not mp.get_property("path") then
         layer:hide()
+        info = { open = false }
+        publish()
         return
     end
     local ow, oh, s = layer:start()
     local t = ui.theme
     local w = panel_width()
     local x0 = ow - w
+    info = { open = true, tab = tab, x0 = x0, width = w, oh = oh, ow = ow, scale = s }
 
     layer:rect(x0, 0, w, oh, t.bg, 236)
     layer:rect(x0, 0, 1, oh, t.line, 255)
@@ -286,6 +308,7 @@ local function draw_impl()
         id = "surface",
         scroll = function(dir)
             scroll = scroll - dir
+            follow = false -- 손으로 움직였으면 재생 중인 항목을 억지로 따라가지 않는다
             draw()
         end,
     })
@@ -370,15 +393,17 @@ local function draw_impl()
         local rows
         if tab == "pl" then
             rows = playlist_rows()
+            info.sort_top = top
             local bw2 = (w - 20 * s) / #SORTS
             for i, def in ipairs(SORTS) do
                 local id = def.id
                 local x = x0 + 10 * s + (i - 1) * bw2
                 local on = state.prefs.sort == id
                 local arrow = (on and id ~= "none") and (state.prefs.sort_desc and " ↓" or " ↑") or ""
-                layer:text_fit(x + bw2 / 2, top + 2 * s, 11 * s, on and t.accent or t.mute, 8,
-                    def.t .. arrow, bw2 - 2 * s)
-                layer:hit(x, top - 2 * s, bw2, 20 * s, {
+                if on then layer:rect(x + 2 * s, top, bw2 - 4 * s, 22 * s, t.bg2, 200) end
+                layer:text_fit(x + bw2 / 2, top + 3 * s, 11 * s, on and t.accent or t.mute, 8,
+                    def.t .. arrow, bw2 - 6 * s)
+                layer:hit(x, top, bw2, 22 * s, {
                     id = "sort" .. id,
                     click = function()
                         if state.prefs.sort == id then
@@ -394,7 +419,8 @@ local function draw_impl()
                     end,
                 })
             end
-            top = top + 24 * s
+            -- 정렬 줄과 목록 사이에 여백을 둔다 (잘못 눌러 엉뚱한 화가 재생되지 않도록)
+            top = top + 30 * s
         elseif tab == "chapter" then
             rows = chapter_rows()
         else
@@ -404,16 +430,24 @@ local function draw_impl()
         local row_h = 30 * s
         local vis = math.max(1, math.floor((bottom - top) / row_h))
         local max_scroll = math.max(0, #rows - vis)
-        if scroll > max_scroll then scroll = max_scroll end
-        if scroll < 0 then scroll = 0 end
+        scroll = util.clamp(scroll, 0, max_scroll)
 
-        -- 현재 항목이 화면 밖이면 따라간다.
-        for i, r in ipairs(rows) do
-            if r.current and (i <= scroll or i > scroll + vis) then
-                scroll = util.clamp(i - math.ceil(vis / 2), 0, max_scroll)
-                break
+        -- 재생 중인 항목 따라가기는 파일이 바뀌거나 패널을 열 때 한 번만 한다.
+        -- 매번 하면 휠을 굴려도 곧바로 제자리로 끌려와서 스크롤이 안 되는 것처럼 보인다.
+        if follow then
+            for i, r in ipairs(rows) do
+                if r.current then
+                    if i <= scroll or i > scroll + vis then
+                        scroll = util.clamp(i - math.ceil(vis / 2), 0, max_scroll)
+                    end
+                    break
+                end
             end
+            follow = false
         end
+
+        info.scroll, info.rows, info.vis = scroll, #rows, vis
+        info.max_scroll, info.top, info.row_h = max_scroll, top, row_h
 
         for i = 1, vis do
             local row = rows[scroll + i]
@@ -421,27 +455,47 @@ local function draw_impl()
             local y = top + (i - 1) * row_h
             local id = "row" .. (scroll + i)
             local hot = layer:hovered(id)
-            if hot then layer:rect(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s, t.hover, 110) end
-            if row.current then layer:rect(x0 + 6 * s, y + 4 * s, 3 * s, row_h - 10 * s, t.accent, 255) end
+            if row.selected then
+                layer:rect(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s, t.hover, hot and 210 or 170)
+            elseif hot then
+                layer:rect(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s, t.hover, 110)
+            end
+            if row.current then
+                layer:rect(x0 + 6 * s, y + 4 * s, 3 * s, row_h - 10 * s, t.accent, 255)
+            elseif row.selected then
+                layer:rect(x0 + 6 * s, y + 4 * s, 3 * s, row_h - 10 * s, t.mute, 220)
+            end
             local hint_w = row.hint and (util.text_width(row.hint, 11 * s) + 10 * s) or 0
             layer:text_fit(x0 + 16 * s, y + 7 * s, 12.5 * s,
-                (row.current or hot) and t.text or t.mute, 7, row.text, w - 30 * s - hint_w)
+                (row.current or hot or row.selected) and t.text or t.mute, 7, row.text,
+                w - 30 * s - hint_w)
             if row.hint and row.hint ~= "" then
                 layer:text(x0 + w - 12 * s, y + 8 * s, 11 * s, t.mute, 9, row.hint)
             end
-            layer:hit(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s, { id = id, click = row.click })
+            layer:hit(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s,
+                { id = id, click = row.click, dbl = row.dbl })
         end
 
         if #rows == 0 then
             layer:text(x0 + 16 * s, top + 6 * s, 12.5 * s, t.mute, 7, "비어 있음")
         end
 
-        -- 스크롤 막대
-        if #rows > vis then
+        -- 스크롤 막대 (끌어서 움직일 수 있다)
+        if max_scroll > 0 then
             local track_h = bottom - top
-            local kh = math.max(20 * s, track_h * vis / #rows)
+            local kh = math.max(24 * s, track_h * vis / #rows)
             local ky = top + (track_h - kh) * (scroll / max_scroll)
-            layer:rect(ow - 4 * s, ky, 3 * s, kh, t.mute, 140)
+            local hot = layer:hovered("scrollbar")
+            layer:rect(ow - 6 * s, top, 3 * s, track_h, t.line, 140)
+            layer:rect(ow - 6 * s, ky, 3 * s, kh, hot and t.text or t.mute, hot and 230 or 150)
+            local function to_scroll(_, my)
+                local pos = util.clamp((my - top - kh / 2) / math.max(1, track_h - kh), 0, 1)
+                scroll = util.round(pos * max_scroll)
+                follow = false
+                draw()
+            end
+            layer:hit(ow - 14 * s, top, 14 * s, track_h,
+                { id = "scrollbar", press = to_scroll, drag = to_scroll })
         end
         layer:text(x0 + 12 * s, oh - 20 * s, 11 * s, t.mute, 7,
             string.format("%d개", #rows))
@@ -462,36 +516,40 @@ local function draw_impl()
         end
     end
 
-    -- 왼쪽 가장자리: 끌어서 너비 조절
+    -- 왼쪽 가장자리: 끌어서 너비 조절 (누른 채로 움직이면 자유롭게, 그냥 누르면 정해진 크기 순환)
     local grip = layer:hovered("grip")
     layer:rect(x0, 0, grip and 3 * s or 1, oh, grip and t.accent or t.line, 255)
-    layer:hit(x0 - 5 * s, 0, 12 * s, oh, {
+    local max_w = math.max(MIN_W, ow - KEEP_VIDEO)
+    layer:hit(x0 - 7 * s, 0, 16 * s, oh, {
         id = "grip",
         drag = function(mx)
-            state.prefs.panel_w = math.max(220, math.floor(ow - mx))
+            local want = util.round(util.clamp(ow - mx, MIN_W, max_w))
+            if want == state.prefs.panel_w then return end
+            state.prefs.panel_w = want
             state.mark("prefs")
             apply_margin()
             draw()
         end,
         drag_end = function(moved)
-            if not moved then
-                local presets = { 260, 320, 420, 540 }
-                local cur, nxt = state.prefs.panel_w, presets[1]
-                for i, p in ipairs(presets) do
-                    if cur < p - 10 then
-                        nxt = p
-                        break
-                    end
-                    nxt = presets[(i % #presets) + 1]
+            if moved then return end
+            local presets = { 260, 320, 420, 540 }
+            local cur, nxt = state.prefs.panel_w, presets[1]
+            for i, p in ipairs(presets) do
+                if cur < p - 10 then
+                    nxt = p
+                    break
                 end
-                state.prefs.panel_w = nxt
-                state.mark("prefs")
-                apply_margin()
-                draw()
+                nxt = presets[(i % #presets) + 1]
             end
+            state.prefs.panel_w = util.clamp(nxt, MIN_W, max_w)
+            state.mark("prefs")
+            apply_margin()
+            draw()
         end,
     })
 
+    info.hover = ui.hovered_id()
+    publish()
     layer:flush()
 end
 
@@ -516,9 +574,11 @@ function M.set(target)
             open = not open
         end
     end
+    if open then follow = true end
     ui.hold_cursor(open)
     apply_margin()
     draw()
+    ui.update_dragging()
 end
 
 function M.is_open()
@@ -532,6 +592,15 @@ function M.init()
     mp.register_script_message("boda-panel", function(target) M.set(target or "toggle") end)
 
     mp.add_key_binding(nil, "panel-toggle", function() M.set("toggle") end)
+
+    -- 목록에서 고른 항목이 있으면 그것을, 없으면 지금 재생 중인 것을 뺀다.
+    mp.add_key_binding(nil, "playlist-remove", function()
+        local idx = selected or mp.get_property_number("playlist-pos")
+        if not idx then return end
+        mp.commandv("playlist-remove", idx)
+        selected = nil
+        if open then draw() end
+    end)
     for _, def in ipairs(TABS) do
         local id = def.id
         mp.add_key_binding(nil, "panel-" .. id, function() M.set(id) end)
@@ -542,6 +611,11 @@ function M.init()
         apply_sort()
         if open then draw() end
     end)
+    -- 재생 중인 파일이 바뀌었을 때만 목록을 그 항목으로 따라 움직인다.
+    mp.observe_property("playlist-pos", "number", function()
+        follow = true
+        if open then draw() end
+    end)
     for _, prop in ipairs({ "track-list", "chapter", "sid", "aid", "vid" }) do
         mp.observe_property(prop, "native", function()
             if open then draw() end
@@ -550,11 +624,14 @@ function M.init()
 
     mp.register_event("file-loaded", function()
         remember_current()
+        follow = true
         apply_margin()
         if open then draw() end
+        ui.update_dragging()
     end)
     mp.register_event("end-file", function()
         apply_margin()
+        draw()
     end)
 end
 

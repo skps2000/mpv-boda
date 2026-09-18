@@ -19,7 +19,7 @@ jobs:
           sudo luarocks install luacheck
 
       - name: 검사
-        run: luacheck scripts
+        run: luacheck scripts tests
 
   config:
     name: 설정 파일 검사

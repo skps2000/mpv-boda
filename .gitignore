@@ -11,6 +11,7 @@
 !input.conf
 !script-opts/*.conf
 !scripts/**/*.lua
+!tests/*.lua
 !docs/images/*.png
 !.github/workflows/*.yml
 
