@@ -1,0 +1,27 @@
+# 화이트리스트 방식: 기본은 전부 제외하고, 공개할 파일만 다시 포함한다.
+# mpv 설정 폴더에는 시청 기록 같은 개인 파일이 함께 쌓이므로 블랙리스트는 위험하다.
+*
+!*/
+
+!.gitignore
+!.luacheckrc
+!LICENSE
+!*.md
+!mpv.conf
+!input.conf
+!script-opts/*.conf
+!scripts/**/*.lua
+
+# 안전장치: 아래 규칙이 위 허용보다 우선한다 (개인 기록은 어떤 경우에도 커밋 금지).
+history.*
+bookmarks.*
+recent-folders.*
+ui-state.*
+skip-map.*
+watch_later/
+cache/
+*.log
+*.pid
+*.bgra
+*.m3u
+*.m3u8
