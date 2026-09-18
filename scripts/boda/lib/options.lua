@@ -16,6 +16,7 @@ local M = {
     history_size = 60,        -- 기록 보관 개수
     panel_width = 360,        -- 목록 패널 기본 너비(px)
     state_dir = "",           -- 기록 저장 폴더 (비우면 mpv 상태 폴더)
+    menu_sections = "",       -- 우클릭 메뉴 구성 (비우면 기본 순서)
 }
 
 local subscribers = {}

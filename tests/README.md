@@ -45,6 +45,23 @@ Select-String -Path "$env:TEMP\boda-test.log" -Pattern '\] T ' |
 | 창 크기 | 전체화면 전환 후에도 패널이 제자리인지 |
 | 정지 | 정지하면 패널이 대기 화면을 가리지 않는지 |
 
+## 우클릭 메뉴 테스트
+
+`tests/menu.lua` 는 메뉴 트리를 만들어 내용·상태·상황별 분기를 확인합니다.
+실제로 메뉴를 띄우면(`context-menu`) 사용자가 닫을 때까지 멈추므로, 트리를 만드는 데까지만 봅니다.
+
+```powershell
+mpv --script-opts=boda-state_dir=$env:TEMPoda-test `
+    --script="$env:APPDATA\mpv	ests\menu.lua" `
+    --log-file="$env:TEMPoda-menu.log" "D:\영상폴더\첫파일.mkv"
+```
+
+메뉴 구성 설정까지 보려면 (쉼표가 들어가므로 `%길이%` 로 감싼다):
+
+```powershell
+--script-opts=boda-state_dir=...,boda-menu_sections=%19%open,fav,-,settings
+```
+
 ## 주의
 
 - 테스트 도중 마우스 커서가 저절로 움직입니다. 다른 작업 중에는 돌리지 마세요.

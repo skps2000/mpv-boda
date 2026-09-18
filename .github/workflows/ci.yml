@@ -45,7 +45,10 @@ jobs:
 
       - name: input.conf 가 부르는 동작이 실제로 있는지 확인
         run: |
-          grep -o 'script-binding boda/[a-z0-9-]*' input.conf | sed 's|.*boda/||' | sort -u > used.txt
+          {
+            grep -o 'script-binding boda/[a-z0-9-]*' input.conf | sed 's|.*boda/||'
+            grep -ohE 'bind\("[a-z0-9-]+"\)' scripts/boda/mod/menu.lua | sed 's/.*"\(.*\)".*/\1/'
+          } | sort -u > used.txt
           { grep -ohE 'add_key_binding\(nil, "[a-z0-9-]+"' -r scripts/boda | sed 's/.*"\(.*\)"/\1/'
             grep -ohE '\b(action|vf_action|af_action)\("[a-z0-9-]+"' -r scripts/boda | sed 's/.*"\(.*\)"/\1/'
             grep -ohE '\{ id = "[a-z0-9-]+"' scripts/boda/mod/panel.lua | sed 's/.*"\(.*\)"/panel-\1/'

@@ -135,6 +135,12 @@ if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }
 
     mp.add_key_binding(nil, "browse-folder", browse_folder)
 
+    -- 메뉴에서 최근 폴더를 번호로 고른다
+    mp.register_script_message("boda-open-recent", function(n)
+        local dir = (state.recent or {})[tonumber(n) or 0]
+        if dir then load_folder(dir) end
+    end)
+
     action("open-sub", function()
         ps_async([[
 Add-Type -AssemblyName System.Windows.Forms

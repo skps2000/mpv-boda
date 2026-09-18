@@ -67,6 +67,14 @@ function M.init()
         if paused then snapshot() end
     end)
 
+    -- 메뉴/대기 화면에서 기록을 번호로 연다
+    mp.register_script_message("boda-play-history", function(n)
+        local h = (state.history or {})[tonumber(n) or 0]
+        if not h or not h.path then return end
+        mp.commandv("loadfile", h.path, "replace")
+        mp.set_property_bool("pause", false)
+    end)
+
     mp.add_key_binding(nil, "history-clear", function()
         state.history = {}
         state.mark("history")

@@ -22,6 +22,7 @@ require("mod.dialogs").init()
 require("mod.seekbar").init()
 require("mod.panel").init()
 require("mod.idle").init()
+require("mod.menu").init()
 
 -- 마우스 입력 창구는 여기 하나뿐이다.
 mp.add_key_binding(nil, "mouse-left", function(e)

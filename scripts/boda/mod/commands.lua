@@ -231,6 +231,36 @@ function M.init()
         osd("이 영상의 즐겨찾기를 비웠습니다")
     end)
 
+    local function favorite_at(n)
+        local path = mp.get_property("path")
+        local list = state.favorites_of(path)
+        return path, list, list[tonumber(n) or 0]
+    end
+    mp.register_script_message("boda-favorite-play", function(n)
+        local _, _, f = favorite_at(n)
+        if f then mp.commandv("seek", f.a, "absolute") end
+    end)
+    mp.register_script_message("boda-favorite-loop", function(n)
+        local _, _, f = favorite_at(n)
+        if not f or not f.b then return end
+        mp.set_property_number("ab-loop-a", f.a)
+        mp.set_property_number("ab-loop-b", f.b)
+        mp.commandv("seek", f.a, "absolute")
+        mp.set_property_bool("pause", false)
+    end)
+    mp.register_script_message("boda-favorite-remove", function(n)
+        local path, list = favorite_at(n)
+        local idx = tonumber(n)
+        if not path or not idx or not list[idx] then return end
+        local out = {}
+        for i, v in ipairs(list) do
+            if i ~= idx then out[#out + 1] = v end
+        end
+        state.set_favorites(path, out)
+        mp.commandv("script-message", "boda-refresh")
+        osd("즐겨찾기에서 지웠습니다")
+    end)
+
     -- 위치 이동
     action("jump-start", function()
         mp.commandv("seek", 0, "absolute")
