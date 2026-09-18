@@ -17,8 +17,8 @@ local function check(_, pos)
     if pos < s.outro then return end
     done = true
     local count = mp.get_property_number("playlist-count") or 1
-    local pos = mp.get_property_number("playlist-pos") or 0
-    if pos + 1 < count then
+    local index = mp.get_property_number("playlist-pos") or 0
+    if index + 1 < count then
         mp.commandv("playlist-next")
         mp.set_property_bool("pause", false)
         mp.osd_message(t("skip_outro"))

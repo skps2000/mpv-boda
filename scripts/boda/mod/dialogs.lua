@@ -225,9 +225,9 @@ if ($f.ShowDialog() -eq 'OK') { $f.FileName }
             end
         end
         ps_async("Get-Clipboard -Raw", function(out)
-            local text = out:gsub("^%s+", ""):gsub("%s+$", "")
-            if text ~= "" then
-                mp.commandv("loadfile", text, "replace")
+            local clip = out:gsub("^%s+", ""):gsub("%s+$", "")
+            if clip ~= "" then
+                mp.commandv("loadfile", clip, "replace")
                 mp.set_property_bool("pause", false)
                 mp.osd_message(t("clipboard_opened"))
             else
