@@ -48,7 +48,7 @@ jobs:
           grep -o 'script-binding boda/[a-z0-9-]*' input.conf | sed 's|.*boda/||' | sort -u > used.txt
           { grep -ohE 'add_key_binding\(nil, "[a-z0-9-]+"' -r scripts/boda | sed 's/.*"\(.*\)"/\1/'
             grep -ohE '\b(action|vf_action|af_action)\("[a-z0-9-]+"' -r scripts/boda | sed 's/.*"\(.*\)"/\1/'
-            printf 'panel-pl\npanel-audio\npanel-sub\npanel-video\npanel-chapter\npanel-color\n'
+            grep -ohE '\{ id = "[a-z0-9-]+"' scripts/boda/mod/panel.lua | sed 's/.*"\(.*\)"/panel-\1/'
             for i in $(seq 0 9); do echo "digit-$i"; done
             printf 'mark-intro\nmark-outro\n'
           } | sort -u > registered.txt
