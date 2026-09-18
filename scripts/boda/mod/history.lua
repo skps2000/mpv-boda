@@ -41,7 +41,7 @@ M.snapshot = snapshot
 local function on_loaded()
     local path = mp.get_property("path")
     if not path then return end
-    state.remember_folder(path)
+    if not util.is_url(path) then state.remember_folder(util.dirname(path)) end
 
     if opts.resume then
         local h = find(path)

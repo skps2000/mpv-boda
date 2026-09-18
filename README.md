@@ -9,17 +9,21 @@ boda는 팟플레이어 단축키를 그대로 옮기고, 자주 쓰는 UI만 mp
 
 ## 무엇이 들어 있나
 
+- **폴더 열기** (F2) — 최근에 본 폴더가 맨 위에 뜨고, 고르면 **하위 폴더까지 전부** 훑어서 목록에 담습니다
 - **팟플레이어 단축키** — 속도(Z/X/C), A-B 반복(`[` `]`), 북마크(P), 프레임 이동(D/F), 색감(W~O) 등
-- **창 안 사이드 패널** (F6) — 재생목록 · 오디오 · 자막 · 비디오 · 챕터 · 색감을 탭으로. 영상을 가리지 않고 옆으로 밀어냅니다.
+- **창 안 사이드 패널** (F6) — 재생목록 · 오디오 · 자막 · 비디오 · 챕터 · 즐겨찾기 · 색감을 탭으로. 영상을 가리지 않고 옆으로 밀어냅니다.
   왼쪽 가장자리를 끌어 너비를 자유롭게 조절하고(그냥 누르면 정해진 너비로 순환), 휠이나 스크롤바로 목록을 넘깁니다.
   목록은 한 번 클릭하면 바로 재생합니다
 - **대기 화면 이어보기** — 재생이 끝나거나 F4로 멈추면 최근 본 영상이 진행률과 함께 뜹니다. 숫자키로 바로 열기
 - **아래쪽 탐색바** — 클릭 탐색, 챕터 표시, A-B 구간 표시, 볼륨, 마우스 올리면 미리보기(ffmpeg 필요)
+- **즐겨찾기 구간** (Insert) — `[` 와 `]` 로 구간을 정하고 담아두면, 목록에서 눌러 그 장면으로 가거나 구간 반복
 - **오프닝/엔딩 스킵** (Ctrl+I / Ctrl+O) — 파일마다 지점을 기억했다가 다음부터 자동으로 넘깁니다
 - **이어보기 기록** — 파일별 마지막 위치를 저장. 다 본 영상은 "다 봄"으로 표시
 - **PiP**(F10), **보스키**(B), **화면 캡처 클립보드 복사**(Ctrl+C), **녹화**(Ctrl+Shift+R)
 
 ![목록 패널](docs/images/panel.png)
+
+![즐겨찾기 구간](docs/images/favorites.png)
 
 ![색감 패널](docs/images/color.png)
 
@@ -82,7 +86,7 @@ zip으로 받으려면 [Releases](https://github.com/skps2000/mpv-boda/releases)
 | `ffmpeg` | (자동) | ffmpeg 경로 |
 | `wheel_volume` | `5` | 휠 한 칸 음량 |
 | `history_size` | `60` | 대기 화면 기록 개수 |
-| `panel_width` | `320` | 목록 패널 기본 너비(px) |
+| `panel_width` | `360` | 목록 패널 기본 너비(px) |
 | `state_dir` | (자동) | 기록 저장 폴더 |
 
 ## 기록은 어디에 저장되나
@@ -92,6 +96,7 @@ zip으로 받으려면 [Releases](https://github.com/skps2000/mpv-boda/releases)
 ```
 history.json     최근 본 영상과 위치
 bookmarks.json   파일별 북마크
+favorites.json   파일별 즐겨찾기 구간
 skips.json       파일별 오프닝/엔딩 지점
 prefs.json       패널 너비, 정렬, 색보정 설정
 ```
@@ -153,7 +158,7 @@ mpv와 팟플레이어는 각각의 프로젝트/회사 것이며, 이 저장소
 
 **boda** is a PotPlayer-style configuration for [mpv](https://mpv.io) on Windows.
 It maps PotPlayer's keyboard shortcuts onto mpv and draws the pieces of UI you actually use —
-a tabbed side panel (playlist, tracks, chapters, color), a bottom seek bar with thumbnail previews,
+a tabbed side panel (playlist, tracks, chapters, saved clips, color), a bottom seek bar with thumbnail previews,
 and a "continue watching" screen when nothing is playing.
 
 The UI text is Korean. Install by cloning into `%APPDATA%\mpv` (back up your existing config first),

@@ -84,7 +84,22 @@ if ($f.ShowDialog() -eq 'OK') { $f.FileNames -join "`n" }
 ]], function(out) open_paths(out, "replace") end)
     end)
 
-    action("open-folder", function()
+    -- 폴더를 열면 하위 폴더까지 전부 훑어서 재생목록에 넣는다.
+    local function load_folder(dir)
+        if not dir or dir == "" then return end
+        dir = dir:gsub("[\\/]+$", "")
+        if not util.exists(dir) then
+            mp.osd_message("폴더를 찾을 수 없습니다\n" .. dir, 2.5)
+            state.forget_folder(dir)
+            return
+        end
+        state.remember_folder(dir)
+        mp.commandv("loadfile", dir, "replace", -1, "directory-mode=recursive")
+        mp.set_property_bool("pause", false)
+        mp.osd_message("폴더 열기: " .. dir, 2)
+    end
+
+    local function browse_folder()
         ps_async([[
 Add-Type -AssemblyName System.Windows.Forms
 $d = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -93,13 +108,32 @@ $d.SelectedPath = ]] .. ps_quote(start_dir()) .. [[
 
 if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }
 ]], function(out)
-            local dir = out:gsub("%s+$", "")
-            if dir ~= "" then
-                mp.commandv("loadfile", dir, "replace")
-                mp.set_property_bool("pause", false)
-            end
+            load_folder((out:gsub("%s+$", "")))
         end)
+    end
+
+    -- F2: 최근 폴더를 위에 세워 바로 고르게 하고, 맨 아래에서 찾아보기로 넘어간다.
+    action("open-folder", function()
+        local dirs = {}
+        for _, d in ipairs(state.recent or {}) do dirs[#dirs + 1] = d end
+        if not (has_input and input.select) or #dirs == 0 then
+            browse_folder()
+            return
+        end
+        local items = {}
+        for i, d in ipairs(dirs) do items[i] = d end
+        items[#items + 1] = "▸ 폴더 찾아보기…"
+        input.select({
+            prompt = "폴더 열기 — 최근 폴더",
+            items = items,
+            default_item = 1,
+            submit = function(i)
+                if dirs[i] then load_folder(dirs[i]) else browse_folder() end
+            end,
+        })
     end)
+
+    mp.add_key_binding(nil, "browse-folder", browse_folder)
 
     action("open-sub", function()
         ps_async([[

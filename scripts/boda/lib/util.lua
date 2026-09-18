@@ -16,30 +16,19 @@ end
 
 -- ── ASS 이스케이프 ──────────────────────────────────────────────────
 -- libass 는 \N \h \{ 같은 시퀀스를 해석한다. 그냥 넣으면 "D:\New" 가 줄바꿈이 된다.
+-- mpv 의 escape-ass 명령과 같은 일을 Lua 안에서 한다.
+-- 명령으로 부르면 글자 한 덩이마다 mpv 코어와 왕복해서,
+-- 목록 40줄을 처음 그리는 데만 0.7초가 걸렸다.
 local esc_cache, esc_count = {}, 0
-local native_escape = true
-
-local function esc_fallback(s)
-    s = s:gsub("\\", "\\\226\129\160") -- 역슬래시 뒤에 U+2060 을 끼워 시퀀스를 끊는다
-    s = s:gsub("([{}])", "\\%1")
-    return s
-end
 
 function M.esc(s)
     s = tostring(s or "")
     local cached = esc_cache[s]
     if cached then return cached end
-    local out
-    if native_escape then
-        local ok, res = pcall(mp.command_native, { "escape-ass", s })
-        if ok and type(res) == "string" then
-            out = res
-        else
-            native_escape = false -- mpv 0.37 미만
-        end
-    end
-    out = out or esc_fallback(s)
-    if esc_count > 600 then
+    -- 역슬래시 뒤에 U+2060 을 끼워 \N \h 같은 시퀀스를 끊는다
+    local out = s:gsub("\\", "\\\226\129\160")
+    out = out:gsub("([{}])", "\\%1")
+    if esc_count > 2000 then
         esc_cache, esc_count = {}, 0
     end
     esc_cache[s] = out

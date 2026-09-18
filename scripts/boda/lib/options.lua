@@ -14,7 +14,7 @@ local M = {
     ffmpeg = "",              -- ffmpeg 경로 (비우면 자동 탐색)
     wheel_volume = 5,         -- 휠 한 칸 음량
     history_size = 60,        -- 기록 보관 개수
-    panel_width = 320,        -- 목록 패널 기본 너비(px)
+    panel_width = 360,        -- 목록 패널 기본 너비(px)
     state_dir = "",           -- 기록 저장 폴더 (비우면 mpv 상태 폴더)
 }
 

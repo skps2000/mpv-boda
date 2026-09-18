@@ -37,7 +37,8 @@ local function build_theme()
         line = to_ass("323232"),
         track = to_ass("717171"),
         text = to_ass("FFFFFF"),
-        mute = to_ass("AAAAAA"),
+        text2 = to_ass("E4E4E4"),
+        mute = to_ass("9E9E9E"),
         accent = to_ass(opts.accent),
     }
 end

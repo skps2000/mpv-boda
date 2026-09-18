@@ -98,7 +98,7 @@ step(0.6, function()
     mp.commandv("script-message", "boda-panel", "pl")
 end)
 
-step(0.5, function()
+step(0.8, function()
     local n = info()
     check("패널이 열린다", n.open == true, "open=" .. tostring(n.open))
     check("한 화면에 다 안 들어와 스크롤이 필요하다", (n.max_scroll or 0) > 0,
@@ -256,15 +256,17 @@ end)
 step(0.3, function()
     log("[6] 탭")
     local n = info()
-    local tw = (n.width - 12 * n.scale) / 6
+    local count = n.tabs or 6
+    local tw = (n.width - 12 * n.scale) / count
     saved.tabx = {}
-    for i = 1, 6 do saved.tabx[i] = n.x0 + 6 * n.scale + (i - 0.5) * tw end
-    click(saved.tabx[2], 16 * n.scale)
+    for i = 1, count do saved.tabx[i] = n.x0 + 6 * n.scale + (i - 0.5) * tw end
+    saved.taby = 16 * n.scale
+    click(saved.tabx[2], saved.taby) -- 오디오
 end)
 
 step(0.4, function()
     check("오디오 탭으로 바뀐다", info().tab == "audio", tostring(info().tab))
-    click(saved.tabx[5], 16 * info().scale)
+    click(saved.tabx[5], saved.taby) -- 챕터
 end)
 
 step(0.4, function()
@@ -279,7 +281,7 @@ end)
 step(0.5, function()
     check("패널 빈 곳을 눌러도 영상이 멈추지 않는다",
         mp.get_property_bool("pause") == saved.paused, "pause=" .. tostring(mp.get_property("pause")))
-    click(saved.tabx[6], 16 * info().scale)
+    click(saved.tabx[(info().tabs or 6)], saved.taby) -- 색감(마지막 탭)
 end)
 
 step(0.4, function()
@@ -328,7 +330,7 @@ end)
 step(0.3, function()
     log("[9] 정렬")
     local n = info()
-    local bw = (n.width - 20 * n.scale) / 6
+    local bw = (n.width - 20 * n.scale) / 6 -- 정렬 칸은 6개(기본/이름/크기/화질/길이/날짜)
     saved.sortx = {}
     for i = 1, 6 do saved.sortx[i] = n.x0 + 10 * n.scale + (i - 0.5) * bw end
     click(saved.sortx[2], n.sort_top + 10 * n.scale) -- 이름
@@ -387,9 +389,71 @@ step(0.6, function()
     mp.set_property_bool("pause", false)
 end)
 
--- ── 12. 창 크기 변화 ────────────────────────────────────────────────
+-- ── 12. 즐겨찾기 구간 ───────────────────────────────────────────────
 step(0.3, function()
-    log("[12] 전체화면")
+    log("[12] 즐겨찾기 구간")
+    mp.set_property_bool("pause", true)
+    local dur = mp.get_property_number("duration") or 10
+    saved.fav_a = dur * 0.25
+    saved.fav_b = dur * 0.7
+    mp.commandv("seek", saved.fav_a, "absolute")
+end)
+
+step(0.4, function() mp.commandv("script-message", "boda-ab-a") end)
+step(0.3, function() mp.commandv("seek", saved.fav_b, "absolute") end)
+step(0.4, function() mp.commandv("script-message", "boda-ab-b") end)
+step(0.4, function() mp.commandv("script-message", "boda-favorite-add") end)
+step(0.4, function() mp.commandv("script-message", "boda-panel", "fav") end)
+
+step(0.7, function()
+    local n = info()
+    check("즐겨찾기 탭이 열린다", n.tab == "fav", tostring(n.tab))
+    check("[ 와 ] 로 정한 구간이 목록에 담긴다", n.rows == 1, "rows=" .. tostring(n.rows))
+    mp.commandv("seek", 0, "absolute")
+end)
+
+step(0.5, function()
+    local x, y = row_xy(1)
+    click(x, y)
+end)
+
+step(0.7, function()
+    local t = mp.get_property_number("time-pos") or -1
+    check("항목을 누르면 구간 시작으로 이동한다", math.abs(t - saved.fav_a) < 1.0,
+        string.format("time-pos=%.1f (기대 %.1f)", t, saved.fav_a))
+    mp.set_property("ab-loop-a", "no")
+    mp.set_property("ab-loop-b", "no")
+end)
+
+step(0.4, function()
+    local n = info()
+    local _, y = row_xy(1)
+    click(n.x0 + n.width - 32 * n.scale, y) -- 반복 버튼
+end)
+
+step(0.7, function()
+    local a = tonumber(mp.get_property("ab-loop-a"))
+    local b = tonumber(mp.get_property("ab-loop-b"))
+    check("반복 버튼이 그 구간을 A-B 반복으로 건다",
+        a ~= nil and b ~= nil and math.abs(a - saved.fav_a) < 1 and math.abs(b - saved.fav_b) < 1,
+        string.format("a=%s b=%s (기대 %.1f/%.1f)", tostring(a), tostring(b),
+            saved.fav_a or -1, saved.fav_b or -1))
+    local n = info()
+    local _, y = row_xy(1)
+    click(n.x0 + n.width - 14 * n.scale, y) -- × 버튼
+end)
+
+step(0.7, function()
+    check("× 를 누르면 목록에서 지워진다", info().rows == 0, "rows=" .. tostring(info().rows))
+    mp.set_property("ab-loop-a", "no")
+    mp.set_property("ab-loop-b", "no")
+    mp.commandv("script-message", "boda-panel", "pl")
+    mp.set_property_bool("pause", false)
+end)
+
+-- ── 13. 창 크기 변화 ────────────────────────────────────────────────
+step(0.3, function()
+    log("[13] 전체화면")
     saved.width_before = info().width
     mp.set_property_bool("fullscreen", true)
 end)
@@ -407,9 +471,9 @@ step(1.2, function()
         math.abs((info().width or 0) - (saved.width_before or 0)) <= 8, tostring(info().width))
 end)
 
--- ── 13. 키보드 토글과 정지 ──────────────────────────────────────────
+-- ── 14. 키보드 토글과 정지 ──────────────────────────────────────────
 step(0.3, function()
-    log("[13] F6 토글과 정지")
+    log("[14] F6 토글과 정지")
     mp.commandv("keypress", "F6")
 end)
 

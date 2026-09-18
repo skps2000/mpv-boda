@@ -17,7 +17,8 @@ local sorting = false
 local meta = {}
 local info = {} -- 지금 화면 상태. user-data/boda/panel 로 공개해 디버깅·테스트에 쓴다.
 local follow = true -- 재생 중인 항목을 화면 안으로 끌어올지 (사용자가 스크롤하면 끈다)
-local selected = nil -- 클릭으로 골라둔 재생목록 항목 (0부터). 재생은 더블클릭.
+local selected = nil -- 클릭으로 골라둔 재생목록 항목 (0부터)
+local stats = { sort_ms = 0, move_ms = 0, moves = 0, meta_ms = 0, meta_done = 0 }
 local draw -- 아래에서 ui.guard 로 감싼다
 
 local function publish()
@@ -30,6 +31,7 @@ local TABS = {
     { id = "sub", t = "자막" },
     { id = "video", t = "비디오" },
     { id = "chapter", t = "챕터" },
+    { id = "fav", t = "즐겨찾기" },
     { id = "color", t = "색감" },
 }
 
@@ -48,6 +50,13 @@ local COLORS = {
     { id = "saturation", name = "채도", keys = "Y / U" },
     { id = "gamma", name = "감마", keys = "Ctrl+Shift+W / E" },
     { id = "hue", name = "색상", keys = "I / O" },
+}
+
+local FAV_ACTIONS = {
+    { t = "[ 시작", msg = "ab-a" },
+    { t = "] 끝", msg = "ab-b" },
+    { t = "+ 추가", msg = "favorite-add" },
+    { t = "비우기", msg = "favorite-clear" },
 }
 
 local ACTIONS = {
@@ -99,9 +108,12 @@ local function remember_current()
     if w > 0 and h > 0 then m.pixels = w * h end
 end
 
+local last_sort_at = 0
+
 local function apply_sort()
     local key = state.prefs.sort
     if key == "none" or sorting then return end
+    local t0 = mp.get_time()
     local pl = mp.get_property_native("playlist") or {}
     local n = #pl
     if n < 2 then return end
@@ -129,6 +141,8 @@ local function apply_sort()
         return util.natural_less(a.name, b.name)
     end)
 
+    local sorted_ms = (mp.get_time() - t0) * 1000
+
     local same = true
     for i = 1, n do
         if rows[i].orig ~= i - 1 then
@@ -138,26 +152,62 @@ local function apply_sort()
     end
     if same then return end
 
-    sorting = true
-    local pos = {}
-    for i = 0, n - 1 do pos[i] = i end
+    -- 옮길 순서를 먼저 다 계산한 뒤 한꺼번에 비동기로 보낸다.
+    -- 하나씩 동기로 보내면 명령마다 mpv 코어와 왕복하느라 500개에 6초가 넘게 걸렸다.
+    local t1 = mp.get_time()
+    local plan = {}
+    local pos, at = {}, {}
+    for i = 0, n - 1 do
+        pos[i] = i
+        at[i] = i
+    end
     for dest = 0, n - 1 do
-        local src = pos[rows[dest + 1].orig]
+        local orig = rows[dest + 1].orig
+        local src = pos[orig]
         if src ~= dest then
-            mp.commandv("playlist-move", src, dest)
-            for k = 0, n - 1 do
-                local p = pos[k]
-                if p == src then
-                    pos[k] = dest
-                elseif src > dest and p >= dest and p < src then
-                    pos[k] = p + 1
-                elseif src < dest and p > src and p <= dest then
-                    pos[k] = p - 1
+            plan[#plan + 1] = { src, dest }
+            -- src 에 있던 것을 dest 로 빼내면 그 사이 항목들이 한 칸씩 밀린다
+            if src > dest then
+                for k = src, dest + 1, -1 do
+                    local moved = at[k - 1]
+                    at[k] = moved
+                    pos[moved] = k
+                end
+            else
+                for k = src, dest - 1 do
+                    local moved = at[k + 1]
+                    at[k] = moved
+                    pos[moved] = k
                 end
             end
+            at[dest] = orig
+            pos[orig] = dest
         end
     end
-    sorting = false
+
+    if #plan == 0 then return end
+
+    sorting = true
+    local left = #plan
+    -- 중간에 목록이 바뀌어 콜백이 다 돌아오지 않더라도 잠금이 풀리도록
+    mp.add_timeout(5, function()
+        if sorting then
+            sorting = false
+            if open then draw() end
+        end
+    end)
+    for _, mv in ipairs(plan) do
+        mp.command_native_async({ "playlist-move", mv[1], mv[2] }, function()
+            left = left - 1
+            if left > 0 then return end
+            sorting = false
+            last_sort_at = mp.get_time()
+            stats.move_ms = (mp.get_time() - t1) * 1000
+            if open then draw() end
+        end)
+    end
+    stats.sort_ms = sorted_ms
+    stats.moves = #plan
 end
 
 -- ── 여백(영상 밀어내기) ─────────────────────────────────────────────
@@ -183,26 +233,33 @@ local function apply_margin()
 end
 
 -- ── 행 만들기 ───────────────────────────────────────────────────────
+-- 오른쪽에 붙는 부가 정보. 목록이 길면 파일 정보를 읽는 것만으로도 느려지므로
+-- 화면에 실제로 그려지는 줄에 대해서만 계산한다.
+local function row_hint(path)
+    if not path or path == "" then return "" end
+    local sort = state.prefs.sort
+    if sort == "size" then
+        return util.fmt_size(meta_of(path).size)
+    elseif sort == "duration" then
+        local d = meta_of(path).duration
+        return d > 0 and util.fmt_time(d) or ""
+    elseif sort == "quality" then
+        local px = meta_of(path).pixels
+        return px > 0 and string.format("%.1fMP", px / 1000000) or ""
+    end
+    return ""
+end
+
 local function playlist_rows()
     local rows = {}
     for i, e in ipairs(mp.get_property_native("playlist") or {}) do
         local idx = i - 1
         local path = e.filename or ""
-        local m = meta_of(path)
-        local hint = ""
-        local sort = state.prefs.sort
-        if sort == "size" then
-            hint = util.fmt_size(m.size)
-        elseif sort == "duration" and m.duration > 0 then
-            hint = util.fmt_time(m.duration)
-        elseif sort == "quality" and m.pixels > 0 then
-            hint = string.format("%.1fMP", m.pixels / 1000000)
-        end
         -- 한 번 클릭하면 바로 재생한다.
         -- 이미 재생 중인 항목이면 다시 시작하지 않는다 (두 번 클릭해도 처음으로 안 돌아가게).
         rows[#rows + 1] = {
             text = e.title or util.basename(path),
-            hint = hint,
+            path = path,
             current = e.current,
             selected = (selected == idx),
             click = function()
@@ -240,6 +297,37 @@ local function track_rows(kind)
                 click = function() mp.set_property(prop, id) end,
             }
         end
+    end
+    return rows
+end
+
+local function fav_rows()
+    local path = mp.get_property("path")
+    local saved = state.favorites_of(path)
+    local rows = {}
+    for i, f in ipairs(saved) do
+        local idx, a, b = i, f.a or 0, f.b
+        local range = b and (util.fmt_time(a) .. " ~ " .. util.fmt_time(b)) or util.fmt_time(a)
+        rows[#rows + 1] = {
+            text = f.name or ("구간 " .. i),
+            hint = range,
+            click = function() mp.commandv("seek", a, "absolute") end,
+            loop = b and function()
+                mp.set_property_number("ab-loop-a", a)
+                mp.set_property_number("ab-loop-b", b)
+                mp.commandv("seek", a, "absolute")
+                mp.set_property_bool("pause", false)
+                mp.osd_message("구간 반복 " .. range)
+            end or nil,
+            remove = function()
+                local list = {}
+                for j, v in ipairs(state.favorites_of(path)) do
+                    if j ~= idx then list[#list + 1] = v end
+                end
+                state.set_favorites(path, list)
+                draw()
+            end,
+        }
     end
     return rows
 end
@@ -286,6 +374,7 @@ end
 
 -- ── 그리기 ──────────────────────────────────────────────────────────
 local function draw_impl()
+    local t_draw = mp.get_time()
     -- 파일이 없을 때는 대기 화면에 자리를 내준다.
     if not open or not ui.ready() or not mp.get_property("path") then
         layer:hide()
@@ -297,9 +386,10 @@ local function draw_impl()
     local t = ui.theme
     local w = panel_width()
     local x0 = ow - w
-    info = { open = true, tab = tab, x0 = x0, width = w, oh = oh, ow = ow, scale = s }
+    info = { open = true, tab = tab, x0 = x0, width = w, oh = oh, ow = ow, scale = s,
+        sort = state.prefs.sort, sort_desc = state.prefs.sort_desc, tabs = #TABS }
 
-    layer:rect(x0, 0, w, oh, t.bg, 236)
+    layer:rect(x0, 0, w, oh, t.bg, 246)
     layer:rect(x0, 0, 1, oh, t.line, 255)
 
     -- 가장 먼저 등록해서 제일 아래에 깔리는 영역: 휠 스크롤과 빈 곳 클릭 차단용.
@@ -313,14 +403,25 @@ local function draw_impl()
     })
 
     -- 탭
-    local tab_h = 34 * s
+    local tab_h = 38 * s
     local tw = (w - 12 * s) / #TABS
+    local tab_fs = 13.5 * s
+    local longest = 0
+    for _, def in ipairs(TABS) do
+        longest = math.max(longest, util.text_width(def.t, tab_fs))
+    end
+    if longest > tw - 4 * s then
+        tab_fs = math.max(11 * s, tab_fs * (tw - 4 * s) / longest)
+    end
     for i, def in ipairs(TABS) do
         local id = def.id
         local x = x0 + 6 * s + (i - 1) * tw
         local on = tab == id
-        layer:text_fit(x + tw / 2, 10 * s, 12.5 * s, on and t.text or t.mute, 8, def.t, tw - 4 * s)
-        if on then layer:rect(x + 6 * s, tab_h - 4 * s, tw - 12 * s, 2 * s, t.accent, 255) end
+        layer:text_fit(x + tw / 2, 12 * s, tab_fs, on and t.text or t.mute, 8, def.t, tw - 2 * s)
+        if on then
+            layer:rect(x + 4 * s, 0, tw - 8 * s, tab_h - 4 * s, t.bg2, 200)
+            layer:rect(x + 4 * s, tab_h - 5 * s, tw - 8 * s, 3 * s, t.accent, 255)
+        end
         layer:hit(x, 0, tw, tab_h, {
             id = "tab" .. id,
             click = function()
@@ -331,15 +432,16 @@ local function draw_impl()
         })
     end
 
+    local acts = (tab == "pl" and ACTIONS) or (tab == "fav" and FAV_ACTIONS) or nil
     local top = tab_h + 6 * s
-    local bottom = oh - (tab == "pl" and 52 * s or 26 * s)
+    local bottom = oh - (acts and 52 * s or 26 * s)
 
     if tab == "color" then
         -- 색감 탭
         local y = top + 6 * s
         local auto = state.prefs.auto_color
         layer:rect(x0 + 16 * s, y, w - 32 * s, 26 * s, auto and t.accent or t.bg2, 255)
-        layer:text(x0 + w / 2, y + 5 * s, 12.5 * s, t.text, 8, auto and "자동 보정 켜짐" or "자동 보정 꺼짐")
+        layer:text(x0 + w / 2, y + 5 * s, 13.5 * s, t.text, 8, auto and "자동 보정 켜짐" or "자동 보정 꺼짐")
         layer:hit(x0 + 16 * s, y, w - 32 * s, 26 * s, {
             id = "auto",
             click = function()
@@ -352,7 +454,7 @@ local function draw_impl()
         y = y + 40 * s
         for _, c in ipairs(COLORS) do
             local val = mp.get_property_number(c.id) or 0
-            layer:text(x0 + 16 * s, y, 12.5 * s, t.text, 7, c.name)
+            layer:text(x0 + 16 * s, y, 13.5 * s, t.text, 7, c.name)
             layer:text(x0 + w - 16 * s, y, 12 * s, t.mute, 9, string.format("%d", val))
             layer:text_fit(x0 + 16 * s + util.text_width(c.name, 12.5 * s) + 8 * s, y + 1.5 * s,
                 10.5 * s, t.mute, 7, c.keys, w - 90 * s)
@@ -399,10 +501,10 @@ local function draw_impl()
                 local x = x0 + 10 * s + (i - 1) * bw2
                 local on = state.prefs.sort == id
                 local arrow = (on and id ~= "none") and (state.prefs.sort_desc and " ↓" or " ↑") or ""
-                if on then layer:rect(x + 2 * s, top, bw2 - 4 * s, 22 * s, t.bg2, 200) end
-                layer:text_fit(x + bw2 / 2, top + 3 * s, 11 * s, on and t.accent or t.mute, 8,
+                if on then layer:rect(x + 2 * s, top, bw2 - 4 * s, 24 * s, t.bg2, 220) end
+                layer:text_fit(x + bw2 / 2, top + 4 * s, 12 * s, on and t.accent or t.mute, 8,
                     def.t .. arrow, bw2 - 6 * s)
-                layer:hit(x, top, bw2, 22 * s, {
+                layer:hit(x, top, bw2, 24 * s, {
                     id = "sort" .. id,
                     click = function()
                         if state.prefs.sort == id then
@@ -419,14 +521,16 @@ local function draw_impl()
                 })
             end
             -- 정렬 줄과 목록 사이에 여백을 둔다 (잘못 눌러 엉뚱한 화가 재생되지 않도록)
-            top = top + 30 * s
+            top = top + 32 * s
         elseif tab == "chapter" then
             rows = chapter_rows()
+        elseif tab == "fav" then
+            rows = fav_rows()
         else
             rows = track_rows(tab)
         end
 
-        local row_h = 30 * s
+        local row_h = 34 * s
         local vis = math.max(1, math.floor((bottom - top) / row_h))
         local max_scroll = math.max(0, #rows - vis)
         scroll = util.clamp(scroll, 0, max_scroll)
@@ -460,23 +564,49 @@ local function draw_impl()
                 layer:rect(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s, t.hover, 110)
             end
             if row.current then
-                layer:rect(x0 + 6 * s, y + 4 * s, 3 * s, row_h - 10 * s, t.accent, 255)
+                layer:rect(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s, t.accent, 40)
+                layer:rect(x0 + 6 * s, y + 3 * s, 4 * s, row_h - 8 * s, t.accent, 255)
             elseif row.selected then
-                layer:rect(x0 + 6 * s, y + 4 * s, 3 * s, row_h - 10 * s, t.mute, 220)
+                layer:rect(x0 + 6 * s, y + 3 * s, 4 * s, row_h - 8 * s, t.mute, 220)
             end
-            local hint_w = row.hint and (util.text_width(row.hint, 11 * s) + 10 * s) or 0
-            layer:text_fit(x0 + 16 * s, y + 7 * s, 12.5 * s,
-                (row.current or hot or row.selected) and t.text or t.mute, 7, row.text,
-                w - 30 * s - hint_w)
-            if row.hint and row.hint ~= "" then
-                layer:text(x0 + w - 12 * s, y + 8 * s, 11 * s, t.mute, 9, row.hint)
+            local hint = row.hint or row_hint(row.path)
+            local right = x0 + w - 14 * s
+            local btn_w = 0
+            local btns = {} -- 클릭 영역은 행보다 나중에 등록해야 위에 올라간다
+            if row.remove then
+                local rid = id .. "x"
+                layer:text(right, y + 7 * s, 15 * s, layer:hovered(rid) and t.text or t.mute, 9, "×")
+                btns[#btns + 1] = { right - 16 * s, 24 * s, rid, row.remove }
+                right = right - 22 * s
+                btn_w = btn_w + 22 * s
+            end
+            if row.loop then
+                local lid = id .. "r"
+                layer:text(right, y + 9 * s, 12 * s, layer:hovered(lid) and t.text or t.mute, 9, "반복")
+                btns[#btns + 1] = { right - 34 * s, 40 * s, lid, row.loop }
+                right = right - 40 * s
+                btn_w = btn_w + 40 * s
+            end
+            local hint_w = (hint ~= "") and (util.text_width(hint, 12 * s) + 12 * s) or 0
+            layer:text_fit(x0 + 18 * s, y + 8 * s, 14.5 * s,
+                (row.current or hot or row.selected) and t.text or t.text2, 7, row.text,
+                w - 34 * s - hint_w - btn_w)
+            if hint ~= "" then
+                layer:text(right, y + 11 * s, 12 * s, t.mute, 9, hint)
             end
             layer:hit(x0 + 6 * s, y, w - 12 * s, row_h - 2 * s,
                 { id = id, click = row.click, dbl = row.dbl })
+            for _, b in ipairs(btns) do
+                layer:hit(b[1], y, b[2], row_h - 2 * s, { id = b[3], click = b[4] })
+            end
         end
 
         if #rows == 0 then
-            layer:text(x0 + 16 * s, top + 6 * s, 12.5 * s, t.mute, 7, "비어 있음")
+            local empty = "비어 있음"
+            if tab == "fav" then
+                empty = "[ 와 ] 로 구간을 정한 뒤 + 추가"
+            end
+            layer:text_fit(x0 + 18 * s, top + 8 * s, 13.5 * s, t.mute, 7, empty, w - 36 * s)
         end
 
         -- 스크롤 막대 (끌어서 움직일 수 있다)
@@ -496,18 +626,18 @@ local function draw_impl()
             layer:hit(ow - 14 * s, top, 14 * s, track_h,
                 { id = "scrollbar", press = to_scroll, drag = to_scroll })
         end
-        layer:text(x0 + 12 * s, oh - 20 * s, 11 * s, t.mute, 7,
+        layer:text(x0 + 14 * s, oh - 21 * s, 12 * s, t.mute, 7,
             string.format("%d개", #rows))
     end
 
-    -- 아래 동작 줄 (목록 탭만)
-    if tab == "pl" then
-        local aw = (w - 16 * s) / #ACTIONS
-        for i, a in ipairs(ACTIONS) do
+    -- 아래 동작 줄
+    if acts then
+        local aw = (w - 16 * s) / #acts
+        for i, a in ipairs(acts) do
             local x = x0 + 8 * s + (i - 1) * aw
             local id = "act" .. i
-            layer:text_fit(x + aw / 2, oh - 44 * s, 11 * s,
-                layer:hovered(id) and t.text or t.mute, 8, a.t, aw - 4 * s)
+            layer:text_fit(x + aw / 2, oh - 45 * s, 12.5 * s,
+                layer:hovered(id) and t.text or t.text2, 8, a.t, aw - 4 * s)
             layer:hit(x, oh - 50 * s, aw, 22 * s, {
                 id = id,
                 click = function() mp.commandv("script-message", "boda-" .. a.msg) end,
@@ -548,6 +678,10 @@ local function draw_impl()
     })
 
     info.hover = ui.hovered_id()
+    stats.draw_ms = (mp.get_time() - t_draw) * 1000
+    info.draw_ms = stats.draw_ms
+    info.sort_ms, info.move_ms, info.moves = stats.sort_ms, stats.move_ms, stats.moves
+    info.meta_ms, info.meta_done = stats.meta_ms, stats.meta_done
     publish()
     layer:flush()
 end
@@ -561,8 +695,11 @@ function M.set(target)
     elseif target == "close" then
         open = false
     else
-        local id = ({ playlist = "pl", pl = "pl", audio = "audio", sub = "sub",
-            video = "video", chapter = "chapter", color = "color" })[target]
+        -- 탭 목록에서 직접 찾는다 (탭이 늘어나도 따로 손볼 필요가 없게)
+        local id = (target == "playlist") and "pl" or nil
+        for _, def in ipairs(TABS) do
+            if def.id == target then id = def.id end
+        end
         if id then
             if open and tab == id then
                 open = false
@@ -589,6 +726,29 @@ function M.init()
     layer.redraw = draw
 
     mp.register_script_message("boda-panel", function(target) M.set(target or "toggle") end)
+    mp.register_script_message("boda-refresh", function()
+        if open then draw() end
+    end)
+
+    -- 키나 다른 스크립트에서 정렬을 부를 수 있게 한다.
+    --   script-message boda-sort size desc
+    mp.register_script_message("boda-sort", function(key, dir)
+        local ok = false
+        for _, def in ipairs(SORTS) do
+            if def.id == key then ok = true end
+        end
+        if not ok then return end
+        if state.prefs.sort == key and dir == nil then
+            state.prefs.sort_desc = not state.prefs.sort_desc
+        else
+            state.prefs.sort = key
+            state.prefs.sort_desc = (dir == "desc")
+        end
+        state.mark("prefs")
+        apply_sort()
+        scroll = 0
+        if open then draw() end
+    end)
 
     mp.add_key_binding(nil, "panel-toggle", function() M.set("toggle") end)
 
@@ -607,7 +767,8 @@ function M.init()
 
     mp.observe_property("playlist", "native", function()
         if sorting then return end
-        apply_sort()
+        -- 방금 우리가 옮긴 결과로 온 알림이면 다시 정렬하지 않는다
+        if mp.get_time() - last_sort_at > 0.3 then apply_sort() end
         if open then draw() end
     end)
     -- 재생 중인 파일이 바뀌었을 때만 목록을 그 항목으로 따라 움직인다.

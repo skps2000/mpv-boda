@@ -203,6 +203,34 @@ function M.init()
         osd("북마크를 지웠습니다")
     end)
 
+    -- 즐겨찾기 구간
+    action("favorite-add", function()
+        local path = mp.get_property("path")
+        if not path then return end
+        local a = tonumber(mp.get_property("ab-loop-a"))
+        local b = tonumber(mp.get_property("ab-loop-b"))
+        if not a then a = mp.get_property_number("time-pos") or 0 end
+        if b and b < a then a, b = b, a end
+        local list = {}
+        for i, v in ipairs(state.favorites_of(path)) do list[i] = v end
+        list[#list + 1] = { a = a, b = b, name = "구간 " .. (#list + 1) }
+        state.set_favorites(path, list)
+        mp.commandv("script-message", "boda-refresh")
+        if b then
+            osd(string.format("즐겨찾기 추가  %s ~ %s", util.fmt_time(a), util.fmt_time(b)))
+        else
+            osd(string.format("즐겨찾기 추가  %s  ([ ] 로 구간을 정하면 구간으로 저장됩니다)",
+                util.fmt_time(a)), 2)
+        end
+    end)
+    action("favorite-clear", function()
+        local path = mp.get_property("path")
+        if not path then return end
+        state.set_favorites(path, {})
+        mp.commandv("script-message", "boda-refresh")
+        osd("이 영상의 즐겨찾기를 비웠습니다")
+    end)
+
     -- 위치 이동
     action("jump-start", function()
         mp.commandv("seek", 0, "absolute")

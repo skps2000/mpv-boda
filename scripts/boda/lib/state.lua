@@ -7,6 +7,7 @@ local opts = require("lib.options")
 local M = {
     history = {},   -- { {path=, pos=, dur=, seen=}, ... } 최근 순
     bookmarks = {}, -- path -> { 초, ... }
+    favorites = {}, -- path -> { {a=시작, b=끝, name=이름}, ... }
     skips = {},     -- path -> {intro=, outro=}
     recent = {},    -- 최근 폴더
     prefs = {},     -- 패널 너비, 정렬, 색보정 자동 여부
@@ -25,12 +26,14 @@ function M.init()
     files = {
         history = dir .. "/history.json",
         bookmarks = dir .. "/bookmarks.json",
+        favorites = dir .. "/favorites.json",
         skips = dir .. "/skips.json",
         prefs = dir .. "/prefs.json",
     }
 
     M.history = util.read_json(files.history) or {}
     M.bookmarks = util.read_json(files.bookmarks) or {}
+    M.favorites = util.read_json(files.favorites) or {}
     M.skips = util.read_json(files.skips) or {}
 
     local p = util.read_json(files.prefs) or {}
@@ -55,6 +58,7 @@ function M.flush()
     if not files.prefs then return end
     if dirty.history then util.write_json(files.history, M.history) end
     if dirty.bookmarks then util.write_json(files.bookmarks, M.bookmarks) end
+    if dirty.favorites then util.write_json(files.favorites, M.favorites) end
     if dirty.skips then util.write_json(files.skips, M.skips) end
     if dirty.prefs then
         util.write_json(files.prefs, {
@@ -68,12 +72,25 @@ function M.flush()
     dirty = {}
 end
 
-function M.remember_folder(path)
-    local dir = (not util.is_url(path)) and util.dirname(path) or nil
-    if not dir then return end
+-- 폴더 경로를 최근 목록 맨 앞으로 올린다.
+function M.remember_folder(dir)
+    if not dir or dir == "" or util.is_url(dir) then return end
+    dir = dir:gsub("[\\/]+$", "")
+    if dir == "" then return end
     local out = { dir }
     for _, p in ipairs(M.recent) do
         if p:lower() ~= dir:lower() and #out < 12 then out[#out + 1] = p end
+    end
+    M.recent = out
+    M.mark("prefs")
+end
+
+-- 없어진 폴더를 최근 목록에서 뺀다.
+function M.forget_folder(dir)
+    if not dir then return end
+    local out = {}
+    for _, p in ipairs(M.recent) do
+        if p:lower() ~= dir:lower() then out[#out + 1] = p end
     end
     M.recent = out
     M.mark("prefs")
@@ -94,6 +111,24 @@ function M.set_bookmarks(path, list)
         M.bookmarks[path] = list
     end
     M.mark("bookmarks")
+end
+
+-- 즐겨찾기 구간: 파일마다 {a, b, name} 목록
+function M.favorites_of(path)
+    if not path then return {} end
+    local list = M.favorites[path]
+    if type(list) ~= "table" then return {} end
+    return list
+end
+
+function M.set_favorites(path, list)
+    if not path then return end
+    if #list == 0 then
+        M.favorites[path] = nil
+    else
+        M.favorites[path] = list
+    end
+    M.mark("favorites")
 end
 
 function M.skip_of(path)
