@@ -96,7 +96,7 @@ local function draw_impl()
         hide_thumb()
         return
     end
-    local ow, oh = layer:start()
+    local _, oh = layer:start()
     local x0, bw, y0, s, vw = geom()
     local t = ui.theme
 

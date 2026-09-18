@@ -78,7 +78,8 @@ $f.Multiselect = $true
 $f.Title = '파일 열기'
 $f.InitialDirectory = ]] .. ps_quote(start_dir()) .. [[
 
-$f.Filter = '동영상/음악|*.mkv;*.mp4;*.avi;*.webm;*.mov;*.ts;*.m2ts;*.wmv;*.flv;*.mpg;*.mpeg;*.m4v;*.flac;*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.opus|재생목록|*.m3u;*.m3u8|모든 파일|*.*'
+$f.Filter = '동영상/음악|*.mkv;*.mp4;*.avi;*.webm;*.mov;*.ts;*.m2ts;*.wmv;*.flv;*.mpg;*.mpeg;*.m4v' +
+  ';*.flac;*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.opus|재생목록|*.m3u;*.m3u8|모든 파일|*.*'
 if ($f.ShowDialog() -eq 'OK') { $f.FileNames -join "`n" }
 ]], function(out) open_paths(out, "replace") end)
     end)

@@ -179,9 +179,14 @@ local function playlist_rows()
         local path = e.filename or ""
         local m = meta_of(path)
         local hint = ""
-        if state.prefs.sort == "size" then hint = util.fmt_size(m.size)
-        elseif state.prefs.sort == "duration" and m.duration > 0 then hint = util.fmt_time(m.duration)
-        elseif state.prefs.sort == "quality" and m.pixels > 0 then hint = math.floor(m.pixels / 1000000 * 10) / 10 .. "MP" end
+        local sort = state.prefs.sort
+        if sort == "size" then
+            hint = util.fmt_size(m.size)
+        elseif sort == "duration" and m.duration > 0 then
+            hint = util.fmt_time(m.duration)
+        elseif sort == "quality" and m.pixels > 0 then
+            hint = string.format("%.1fMP", m.pixels / 1000000)
+        end
         rows[#rows + 1] = {
             text = e.title or util.basename(path),
             hint = hint,

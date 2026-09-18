@@ -3,7 +3,6 @@
 local mp = require("mp")
 local util = require("lib.util")
 local state = require("lib.state")
-local opts = require("lib.options")
 
 local M = {}
 
