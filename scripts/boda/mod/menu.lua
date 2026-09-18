@@ -451,7 +451,7 @@ local function main_menu()
     local paused = mp.get_property_bool("pause")
     local out = {
         item(paused and "재생" or "일시정지", "cycle pause", { key = "Space", disabled = not has_file() }),
-        item("정지", "stop", { key = "F4", disabled = not has_file() }),
+        item("정지", "stop", { key = "Ctrl+F4", disabled = not has_file() }),
         item("이전 파일", "playlist-prev", { key = "PgUp" }),
         item("다음 파일", "playlist-next", { key = "PgDn" }),
         SEP,
@@ -502,11 +502,13 @@ local function idle_menu()
     }
 end
 
--- 커서 위치로 어떤 메뉴를 띄울지 고른다.
-local function pick_menu()
+-- 어떤 메뉴를 띄울지 고른다.
+-- 마우스로 불렀을 때만 커서 아래를 본다. 키(F4)로 부르면 커서가 어디에 있든 기본 메뉴.
+local function pick_menu(from_mouse)
     if not has_file() then return idle_menu(), "idle" end
-    local x, y = ui.mouse_pos()
-    if x then
+    local x, y
+    if from_mouse then x, y = ui.mouse_pos() end
+    if x and y then
         local r = ui.region_at(x, y)
         local id = r and r.id or ""
         local row = id:match("^panel/row(%d+)$")
@@ -566,8 +568,8 @@ local function show_fallback(items, title)
 end
 
 -- ── 띄우기 ──────────────────────────────────────────────────────────
-local function show()
-    local items, kind = pick_menu()
+local function show(from_mouse)
+    local items, kind = pick_menu(from_mouse)
     M.last_kind = kind
     M.last_items = items
     if native_ok ~= false then
@@ -588,8 +590,12 @@ local function show()
 end
 
 function M.init()
-    mp.add_key_binding(nil, "menu", show)
-    mp.register_script_message("boda-menu", show)
+    -- 마우스로 눌렀는지 키로 눌렀는지 구분한다 (complex 로 받아야 알 수 있다)
+    mp.add_key_binding(nil, "menu", function(e)
+        if e and e.event and e.event ~= "down" and e.event ~= "press" then return end
+        show(e and e.is_mouse == true)
+    end, { complex = true })
+    mp.register_script_message("boda-menu", function() show(false) end)
 
     -- 테스트·디버깅용: 메뉴를 띄우지 않고 트리만 만들어 속성으로 내보낸다.
     -- (실제로 context-menu 를 부르면 창이 뜨고 사용자가 닫을 때까지 멈춘다)
@@ -601,7 +607,9 @@ function M.init()
             local info = mp.get_property_native("user-data/boda/panel") or {}
             items, kind = playlist_menu(info.scroll or 0), "playlist"
         elseif which == "auto" then
-            items, kind = pick_menu()
+            items, kind = pick_menu(true)
+        elseif which == "auto-key" then
+            items, kind = pick_menu(false)
         else
             items, kind = main_menu(), "main"
         end
@@ -613,7 +621,7 @@ function M.init()
 
     -- 내장 메뉴가 없는 환경에서 쓰는 대체 방식만 따로 띄워본다
     mp.register_script_message("boda-menu-fallback", function()
-        local items = select(1, pick_menu())
+        local items = select(1, pick_menu(true))
         show_fallback(items, "메뉴")
     end)
 end
