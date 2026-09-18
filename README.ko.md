@@ -86,7 +86,7 @@ zip으로 받으려면 [Releases](https://github.com/skps2000/mpv-boda/releases)
 | 항목 | 기본값 | 설명 |
 |---|---|---|
 | `language` | `en` | UI 언어 (`en` 또는 `ko`) |
-| `font` | `Malgun Gothic` | UI 글꼴 |
+| `font` | `Segoe UI` | UI 글꼴 |
 | `scale` | `0` | UI 배율 (0이면 창 높이에 맞춰 자동) |
 | `accent` | `FF0000` | 강조색 `#RRGGBB` |
 | `auto_color` | `no` | 해상도에 따라 밝기·대비를 자동 조정 |

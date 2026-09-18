@@ -6,7 +6,7 @@ local M = {
     -- language of the UI: en or ko
     language = "en",
     -- looks
-    font = "Malgun Gothic",   -- UI font (covers Latin and Hangul on Windows)
+    font = "Segoe UI",        -- UI font (Windows falls back for glyphs it lacks)
     scale = 0,                -- 0 = follow the window height
     accent = "FF0000",        -- accent colour, #RRGGBB
     -- behaviour

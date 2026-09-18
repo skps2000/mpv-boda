@@ -93,7 +93,7 @@ only place to edit.
 | Option | Default | What it does |
 |---|---|---|
 | `language` | `en` | UI language: `en` or `ko` |
-| `font` | `Malgun Gothic` | UI font |
+| `font` | `Segoe UI` | UI font |
 | `scale` | `0` | UI scale (0 follows the window height) |
 | `accent` | `FF0000` | Accent colour, `#RRGGBB` |
 | `auto_color` | `no` | Nudge brightness/contrast per file |
