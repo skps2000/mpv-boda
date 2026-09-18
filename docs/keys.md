@@ -1,222 +1,227 @@
-# 단축키 전체 목록
+# All keys
 
-팟플레이어 기본 단축키를 옮긴 것입니다. 전부 [`input.conf`](../input.conf)에 있고, 그 파일만 고치면 바뀝니다.
+PotPlayer's default shortcuts, mapped onto mpv. They all live in [`input.conf`](../input.conf),
+and editing that file is all it takes to change them.
 
-> `Shift + 글자`는 mpv에서 **대문자로** 적어야 동작합니다. `Shift+n`이 아니라 `N`.
+한국어: [keys.ko.md](keys.ko.md)
 
-## 일반
+> A shifted letter is written as the capital: `N`, not `Shift+n`.
 
-| 키 | 동작 |
+## General
+
+| Key | Action |
 |---|---|
-| `F1` | 정보 |
-| `F2` | 폴더 열기 (최근 폴더가 먼저 뜨고, 고르면 하위 폴더까지 전부 담는다) |
-| `F3` / `F12` | 파일 열기 |
-| `F4` | 메뉴 열기 |
-| `Ctrl+F4` | 정지 (대기 화면으로) |
-| `F5` / `Ctrl+F` | 설정 폴더 열기 |
-| `F6` | 목록 패널 |
-| `F7` | 색감 패널 |
-| `F8` | 듀얼 자막 |
-| `F9` | 선명 업스케일 켜기/끄기 |
-| `F10` | PiP (작은 창 + 항상 위) |
-| `F11` | 전체화면 |
-| `B` | 보스키 (일시정지 + 최소화) |
-| `Ctrl+U` / `Alt+F12` | URL 또는 경로 입력해서 열기 |
-| `Ctrl+V` | 클립보드에 있는 주소 열기 |
-| `Ctrl+Y` | 지금 파일 다시 열기 |
-| `Alt+O` / `Alt+E` | 자막 파일 열기 |
-| `Ctrl+Alt+Y` | 자막 다시 검색 |
-| `Ctrl+Shift+M` | 재생목록 저장 (바탕화면) |
-| `Ctrl+Shift+O` | 재생목록 열기 |
-| `Ctrl+Shift+R` | 녹화 시작/중지 |
-| `Ctrl+F1` | 재생 통계 |
-| `Ctrl+F12` | mpv 콘솔 |
-| `Alt+F4` | 종료 |
+| `F1` | About |
+| `F2` | Open folder (recent folders first, then everything below the one you pick) |
+| `F3` / `F12` | Open file |
+| `F4` | Menu |
+| `Ctrl+F4` | Stop (back to the idle screen) |
+| `F5` / `Ctrl+F` | Open the config folder |
+| `F6` | Playlist panel |
+| `F7` | Colour panel |
+| `F8` | Dual subtitles |
+| `F9` | Sharp upscale on/off |
+| `F10` | PiP (small window, always on top) |
+| `F11` | Fullscreen |
+| `B` | Boss key (pause and minimise) |
+| `Ctrl+U` / `Alt+F12` | Open a URL or path |
+| `Ctrl+V` | Open what is on the clipboard |
+| `Ctrl+Y` | Reload the current file |
+| `Alt+O` / `Alt+E` | Open a subtitle file |
+| `Ctrl+Alt+Y` | Look for subtitles again |
+| `Ctrl+Shift+M` | Save the playlist (to the desktop) |
+| `Ctrl+Shift+O` | Open a playlist |
+| `Ctrl+Shift+R` | Start / stop recording |
+| `Ctrl+F1` | Playback statistics |
+| `Ctrl+F12` | mpv console |
+| `Alt+F4` | Quit |
 
-## 재생
+## Playback
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `Space` | 재생 / 일시정지 |
-| `PgUp` / `PgDn` | 이전 / 다음 파일 |
-| `Del` | 재생목록에서 빼기 (마지막으로 누른 항목, 없으면 재생 중인 것) |
-| `←` `→` | 5초 이동 |
-| `Ctrl+←` `Ctrl+→` | 30초 이동 |
-| `Shift+←` `Shift+→` | 60초 이동 |
-| `Ctrl+Alt+←` `Ctrl+Alt+→` | 5분 이동 |
-| `Ctrl+Shift+←` `Ctrl+Shift+→` | 키프레임 단위 이동 |
-| `D` | 이전 프레임 |
-| `F` | 다음 프레임 |
-| `Backspace` | 처음으로 |
-| `Ctrl+Backspace` | 중간으로 |
-| `Shift+Backspace` | 끝 30초 전으로 |
-| `G` | 시간을 입력해서 이동 (1:23:00 또는 90) |
-| `Home` / `End` | 이전 / 다음 자막 위치로 |
-| `0`~`9` | 0~90% 위치로. 대기 화면에서는 최근 영상 열기 |
-| `Z` | 속도 되돌리기 (1배 ↔ 직전 속도) |
-| `X` / `C` | 0.1배씩 느리게 / 빠르게 |
+| `Space` | Play / pause |
+| `PgUp` / `PgDn` | Previous / next file |
+| `Del` | Remove from the playlist (the row you last clicked, else the playing one) |
+| `←` `→` | 5 seconds |
+| `Ctrl+←` `Ctrl+→` | 30 seconds |
+| `Shift+←` `Shift+→` | 60 seconds |
+| `Ctrl+Alt+←` `Ctrl+Alt+→` | 5 minutes |
+| `Ctrl+Shift+←` `Ctrl+Shift+→` | Keyframe by keyframe |
+| `D` | Previous frame |
+| `F` | Next frame |
+| `Backspace` | Back to the start |
+| `Ctrl+Backspace` | To the middle |
+| `Shift+Backspace` | 30 s before the end |
+| `G` | Jump to a time you type (1:23:00 or 90) |
+| `Home` / `End` | Previous / next subtitle |
+| `0`–`9` | 0–90 %. On the idle screen they open a recent file |
+| `Z` | Back to normal speed (and back again) |
+| `X` / `C` | Slower / faster by 0.1x |
 
-## 북마크 · 구간 반복
+## Clips, bookmarks and loops
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `P` | 지금 위치를 북마크 |
-| `Shift+PgUp` / `Shift+PgDn` | 이전 / 다음 북마크 (없으면 챕터) |
-| `H` | 챕터·북마크 탭 열기 |
-| `[` / `]` | A 지점 / B 지점 지정 |
-| `{` / `}` | A / B 지점 해제 |
-| `\` | 구간 반복 해제 |
-| `Ctrl+[` / `Ctrl+]` | A / B 지점 0.1초 당기기 |
-| `Alt+[` / `Alt+]` | A / B 지점 0.1초 미루기 |
-| `Ctrl+Alt+[` / `Ctrl+Alt+]` | A·B 동시에 0.1초 이동 |
-| `Ctrl+\` | 지금 자막 처음으로 |
-| `Insert` / `Alt+Insert` | `[` `]` 로 정한 구간을 즐겨찾기에 담기 (구간이 없으면 현재 위치) |
-| `Ctrl+Insert` | 즐겨찾기 탭 열기 |
-| `Ctrl+I` | 오프닝 끝 지점 저장 (다음부터 자동으로 넘김) |
-| `Ctrl+O` | 엔딩 시작 지점 저장 (다음 화로 자동 이동) |
-| `Ctrl+Shift+I` | 저장한 스킵 구간 삭제 |
+| `+` | Save this moment as a clip (with `[` and `]` set, the whole range) |
+| `Ctrl+Insert` | Open the clips tab |
+| `P` | Bookmark this moment |
+| `Shift+PgUp` / `Shift+PgDn` | Previous / next bookmark (chapters when there are none) |
+| `H` | Chapters and bookmarks tab |
+| `[` / `]` | Set A / set B |
+| `{` / `}` | Clear A / clear B |
+| `\` | Clear the loop |
+| `Ctrl+[` / `Ctrl+]` | Nudge A / B 0.1 s earlier |
+| `Alt+[` / `Alt+]` | Nudge A / B 0.1 s later |
+| `Ctrl+Alt+[` / `Ctrl+Alt+]` | Nudge both by 0.1 s |
+| `Ctrl+\` | Back to the start of the current subtitle |
+| `Ctrl+I` | Intro ends here (skipped from next time) |
+| `Ctrl+O` | Outro starts here (moves on to the next file) |
+| `Ctrl+Shift+I` | Clear the skip points for this file |
 
-## 자막
+## Subtitles
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `L` | 자막 탭 |
-| `Alt+L` | 자막 트랙 전환 |
-| `Alt+Ctrl+L` | 보조 자막 전환 |
-| `Alt+H` | 자막 표시 / 숨기기 |
-| `Alt+PgUp` / `Alt+PgDn` | 자막 크기 |
-| `Alt+↑` `Alt+↓` | 자막 위치 |
-| `Alt+←` `Alt+→` | 자막 좌우 여백 |
-| `Alt+Home` | 자막 위치·크기 초기화 |
-| `Alt+I` | 자막을 영상 밖 여백에 |
-| `Alt+B` | 자막 굵게 |
-| `,` / `.` | 자막 싱크 0.5초 |
-| `Ctrl+,` / `Ctrl+.` | 자막 싱크 5초 |
-| `Alt+,` / `Alt+.` | 자막 싱크 50초 |
-| `/` | 자막 싱크 초기화 |
+| `L` | Subtitles tab |
+| `Alt+L` | Next subtitle track |
+| `Alt+Ctrl+L` | Secondary subtitle track |
+| `Alt+H` | Show / hide subtitles |
+| `Alt+PgUp` / `Alt+PgDn` | Size |
+| `Alt+↑` `Alt+↓` | Position |
+| `Alt+←` `Alt+→` | Side margins |
+| `Alt+Home` | Reset position and size |
+| `Alt+I` | Put subtitles in the letterbox |
+| `Alt+B` | Bold |
+| `,` / `.` | Timing by 0.5 s |
+| `Ctrl+,` / `Ctrl+.` | Timing by 5 s |
+| `Alt+,` / `Alt+.` | Timing by 50 s |
+| `/` | Reset timing |
 
-## 영상
+## Video
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `V` | 비디오 탭 |
-| `Alt+V` | 비디오 트랙 전환 |
-| `Ctrl+Q` / `Ctrl+F5` / `Ctrl+F6` | 화면 비율 순환 |
-| `Ctrl+Shift+D` | 디인터레이스 |
-| `J` | 3D 모드 |
-| `Ctrl+Z` / `Ctrl+P` | 좌우 반전 / 상하 반전 |
-| `Alt+K` | 90도 회전 |
-| `Ctrl+B` | 블러 |
-| `Ctrl+R` | 샤픈 |
-| `Ctrl+H` | 디블록 |
-| `Ctrl+N` / `Ctrl+M` | 노이즈 감소 |
-| `Ctrl+Alt+F` | 영상 필터 전부 해제 |
+| `V` | Video tab |
+| `Alt+V` | Next video track |
+| `Ctrl+Q` / `Ctrl+F5` / `Ctrl+F6` | Cycle aspect ratio |
+| `Ctrl+Shift+D` | Deinterlace |
+| `J` | 3D mode |
+| `Ctrl+Z` / `Ctrl+P` | Flip horizontally / vertically |
+| `Alt+K` | Rotate 90° |
+| `Ctrl+B` | Blur |
+| `Ctrl+R` | Sharpen |
+| `Ctrl+H` | Deblock |
+| `Ctrl+N` / `Ctrl+M` | Denoise |
+| `Ctrl+Alt+F` | Remove every video filter |
 
-## 색감
+## Colour
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `Q` | 색보정 껐다 켜기 (원본과 비교) |
-| `W` / `E` | 밝기 |
-| `R` / `T` | 대비 |
-| `Y` / `U` | 채도 |
-| `I` / `O` | 색상 |
-| `Ctrl+Shift+W` / `Ctrl+Shift+E` | 감마 |
-| `Ctrl+Alt+R` | 색보정 초기화 |
-| `Ctrl+Alt+A` | 자동 보정 켜기/끄기 |
-| `F7` | 색감 패널 (슬라이더로 조절) |
+| `Q` | Correction on/off, to compare with the original |
+| `W` / `E` | Brightness |
+| `R` / `T` | Contrast |
+| `Y` / `U` | Saturation |
+| `I` / `O` | Hue |
+| `Ctrl+Shift+W` / `Ctrl+Shift+E` | Gamma |
+| `Ctrl+Alt+R` | Reset |
+| `Ctrl+Alt+A` | Automatic correction on/off |
+| `F7` | Colour panel (sliders) |
 
-## 캡처
+## Capture
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `K` / `Ctrl+G` / `Ctrl+E` | 영상 원본 크기로 캡처 |
-| `Alt+N` / `Ctrl+Alt+C` / `Ctrl+Alt+E` | 자막·UI까지 보이는 대로 캡처 |
-| `Ctrl+S` | 캡처 (자막 포함) |
-| `Ctrl+C` | 지금 화면을 클립보드로 복사 |
+| `K` / `Ctrl+G` / `Ctrl+E` | Save the frame at its own size |
+| `Alt+N` / `Ctrl+Alt+C` / `Ctrl+Alt+E` | Save what you see |
+| `Ctrl+S` | Save the frame with subtitles |
+| `Ctrl+C` | Copy the frame to the clipboard |
 
-저장 위치는 바탕화면입니다. `mpv.conf`의 `screenshot-directory`에서 바꿉니다.
+Files go to the desktop; change `screenshot-directory` in `mpv.conf`.
 
-## 소리
+## Audio
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `↑` / `↓` | 음량 5 |
-| `Shift+↑` / `Shift+↓` | 음량 10 |
-| 휠 | 음량 (패널 위에서는 목록 스크롤) |
-| `M` | 음소거 |
-| `A` | 오디오 탭 |
-| `Alt+A` | 오디오 트랙 전환 |
-| `<` / `>` | 소리 싱크 0.05초 |
-| `\|` | 소리 싱크 초기화 |
-| `N` | 음량 평준화 (작은 소리 키우기) |
-| `T` | 좌우 채널 교환 |
-| `Ctrl+Shift+V` | 보컬 제거 시도 |
-| `Ctrl+Alt+N` | 소리 필터·싱크 초기화 |
+| `↑` / `↓` | Volume by 5 |
+| `Shift+↑` / `Shift+↓` | Volume by 10 |
+| Wheel | Volume (scrolls the list over a panel) |
+| `M` | Mute |
+| `A` | Audio tab |
+| `Alt+A` | Next audio track |
+| `<` / `>` | Timing by 0.05 s |
+| `\|` | Reset timing |
+| `N` | Volume levelling (lift the quiet parts) |
+| `T` | Swap left and right |
+| `Ctrl+Shift+V` | Try to remove vocals |
+| `Ctrl+Alt+N` | Reset audio filters and timing |
 
-## 창
+## Window
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `Tab` | 창 크기 순환 (0.5 → 1 → 1.5 → 2배) |
-| `Enter` / `Alt+Enter` | 전체화면 |
-| `Ctrl+Enter` | 화면 채우기 (잘라내기) |
-| `Ctrl+T` | 항상 위 |
-| `Alt+1`~`Alt+4` | 창 크기 0.5 / 1 / 1.5 / 2배 |
-| `Alt+5` | 최대화 |
-| `` ` `` | 창 크기 0.3배 |
-| `Ctrl+Alt++` / `Ctrl+Alt+-` | 창 크기 미세 조정 |
-| `Shift+Tab` | 재생 통계 |
+| `Tab` | Cycle size (0.5 → 1 → 1.5 → 2x) |
+| `Enter` / `Alt+Enter` | Fullscreen |
+| `Ctrl+Enter` | Fill the window (crop) |
+| `Ctrl+T` | Always on top |
+| `Alt+1`–`Alt+4` | 0.5 / 1 / 1.5 / 2x |
+| `Alt+5` | Maximise |
+| `` ` `` | 0.3x |
+| `Ctrl+Alt++` / `Ctrl+Alt+-` | Fine size steps |
+| `Shift+Tab` | Playback statistics |
 
-### 숫자패드 (확대 · 이동)
+### Numpad (zoom and pan)
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `KP0` | 창 크기 순환 |
-| `KP5` | 원래 크기로 되돌리기 |
-| `KP9` / `KP1` | 확대 / 축소 |
-| `KP8` / `KP2` | 확대 / 축소 (미세) |
-| `KP6` / `KP4` | 화면 비율 조정 |
-| `Ctrl+KP4` `Ctrl+KP6` `Ctrl+KP8` `Ctrl+KP2` | 화면 위치 이동 |
-| `Ctrl+KP5` | 화면 위치 초기화 |
+| `KP0` | Cycle window size |
+| `KP5` | Back to the original size |
+| `KP9` / `KP1` | Zoom in / out |
+| `KP8` / `KP2` | Zoom in / out, finer |
+| `KP6` / `KP4` | Aspect ratio |
+| `Ctrl+KP4` `Ctrl+KP6` `Ctrl+KP8` `Ctrl+KP2` | Pan |
+| `Ctrl+KP5` | Reset panning |
 
-## 마우스
+## Mouse
 
-| 동작 | 결과 |
+| Action | Result |
 |---|---|
-| 왼쪽 클릭 | UI 버튼·탐색바 조작. 재생목록 항목을 누르면 바로 그 화 재생 (영상 위에서는 아무 동작 없음) |
-| 더블 클릭 | 재생 / 일시정지 (UI 위에서는 한 번 클릭과 같게 동작) |
-| 오른쪽 클릭 | 메뉴 열기 (영상 위 / 목록 위 / 대기 화면에 따라 내용이 달라집니다) |
-| 가운데 클릭 | 재생 / 일시정지 |
-| 휠 | 음량 (패널·대기 화면 위에서는 스크롤) |
-| 휠 좌 / 우 | 5초 이동 |
-| 패널 왼쪽 가장자리 끌기 | 패널 너비 조절 (클릭하면 미리 정해진 너비로 순환) |
+| Left click | UI buttons and the seek bar. A playlist row plays straight away (nothing over the video) |
+| Double click | Play / pause (over the UI it behaves like a single click) |
+| Right click | Menu (contents depend on what is under the cursor) |
+| Middle click | Play / pause |
+| Wheel | Volume (scrolls over a panel or the idle screen) |
+| Wheel left / right | 5 seconds |
+| Drag the panel's left edge | Resize it (a plain click cycles preset widths) |
 
-## 우클릭 메뉴
+## The menu
 
-오른쪽 클릭 또는 `F4` 로 엽니다. 키로 열면 커서 위치와 상관없이 기본 메뉴가 뜹니다. 창 기본 메뉴라서 하위 메뉴·체크 표시·키보드 이동이 그대로 됩니다.
+Right click, or press `F4`. It is the native window menu, so submenus, check marks and keyboard
+navigation all work. From a key it always opens the main menu, whatever the cursor is over.
 
-- **영상 위** — 재생/정지, 열기, 이어서 보기, 재생목록, 즐겨찾기, 챕터, 속도, 구간 반복,
-  건너뛰기, 영상, 소리, 자막, 색감, 창, 캡처, 복사, 패널, 설정
-- **목록 위** — 그 항목 재생 / 목록에서 빼기 / 정렬 / 폴더 열기
-- **대기 화면** — 열기 계열과 최근 기록
+- **Over the video** — play/stop, open, continue watching, playlist, clips, chapters, speed,
+  loop, skip, video, audio, subtitles, colour, window, capture, copy, panel, settings
+- **Over the playlist** — play this row, remove it, sort, open a folder
+- **Idle screen** — opening things and recent files
 
-넣을 묶음과 순서는 `script-opts/boda.conf` 의 `menu_sections` 에서 바꿉니다.
-우클릭을 원래대로(재생/일시정지) 돌리려면 `input.conf` 의 `MBTN_RIGHT` 줄을 `cycle pause` 로 바꾸면 됩니다.
+Change which groups appear with `menu_sections` in `script-opts/boda.conf`. To get mpv's default
+right click back, set the `MBTN_RIGHT` line in `input.conf` to `cycle pause`.
 
-## 기본 키가 없는 동작
+## Actions without a key
 
-쓸 만한데 키를 비워둔 것들입니다. `input.conf`에 한 줄 추가하면 됩니다.
+Useful things left unbound. Add a line to `input.conf` to reach them.
 
 ```
-Ctrl+Alt+h   script-binding boda/history-clear      # 이어보기 기록 전체 삭제
-Ctrl+Alt+b   script-binding boda/bookmark-clear     # 이 파일의 북마크 삭제
-Ctrl+Alt+z   script-binding boda/speed-reset        # 속도 1배로
-Ctrl+Alt+o   script-binding boda/osd-toggle         # 탐색바 강제로 켜기/끄기
-Ctrl+Alt+x   script-binding boda/ab-clear           # A·B 지점 한 번에 해제
+Ctrl+Alt+h   script-binding boda/history-clear      # forget the watch history
+Ctrl+Alt+b   script-binding boda/bookmark-clear     # clear this file's bookmarks
+Ctrl+Alt+z   script-binding boda/speed-reset        # back to 1x
+Ctrl+Alt+o   script-binding boda/osd-toggle         # force the seek bar on/off
+Ctrl+Alt+x   script-binding boda/ab-clear           # clear both A and B
 ```
 
-## mpv에 없는 팟플레이어 기능
+## PotPlayer features mpv does not have
 
-누르면 "없다"고 알려만 줍니다: 웹캠/장치(`Ctrl+J`), TV 수신(`Ctrl+W`, `Ctrl+K`), DVD·블루레이(`Ctrl+D`, `Ctrl+Alt+D`),
-자막 입력(`Alt+P`), 자막 글꼴 설정(`Alt+F`), 이퀄라이저(`E`), 레벨 컨트롤(`Ctrl+L`), Freeverb(`R`) 등.
+These only say so when pressed: webcam and capture devices (`Ctrl+J`), TV tuners (`Ctrl+W`,
+`Ctrl+K`), DVD and Blu-ray (`Ctrl+D`, `Ctrl+Alt+D`), subtitle authoring (`Alt+P`), subtitle font
+settings (`Alt+F`), equaliser (`E`), level control (`Ctrl+L`), Freeverb (`R`).
