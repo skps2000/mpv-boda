@@ -19,6 +19,9 @@ local thumb_shown = false
 local thumb_want, thumb_busy, thumb_last = nil, false, -1
 local TW, TH = 192, 108
 
+-- The seek bar sits well above the control row: with the two almost touching,
+-- the eye read them as one strip and a click meant for a button could land on
+-- the track.
 local function geom()
     local ow, oh = ui.osd_size()
     local s = ui.scale()
@@ -26,7 +29,7 @@ local function geom()
     local pad = 18 * s
     local x0 = pad
     local w = math.max(40, ow - right - pad * 2)
-    return x0, w, oh - 46 * s, s, ow - right, oh
+    return x0, w, oh - 58 * s, s, ow - right, oh
 end
 
 -- ── thumbnails ─────────────────────────────────────────────────────
@@ -120,7 +123,7 @@ local function draw_impl()
     local vmax = mp.get_property_number("volume-max") or 130
 
     -- top and bottom scrims
-    local bar_h = 74 * s
+    local bar_h = 86 * s
     local top_h = 52 * s
     for i = 0, 7 do
         layer:rect(0, oh - bar_h + i * (bar_h / 8), vw, bar_h / 8 + 1, "000000", 32 + i * 18)
@@ -165,7 +168,7 @@ local function draw_impl()
         layer:text(lx + lw / 2, y0 - 26 * s, 12 * s, t.text, 8, label)
     end
 
-    layer:hit(x0 - 4 * s, y0 - 12 * s, bw + 8 * s, 24 * s, {
+    layer:hit(x0 - 4 * s, y0 - 11 * s, bw + 8 * s, 22 * s, {
         id = "seek",
         press = function(mx)
             local target = util.clamp((mx - x0) / bw, 0, 1) * dur
@@ -178,14 +181,14 @@ local function draw_impl()
     })
 
     -- button row
-    local iy = oh - 30 * s
+    local iy = oh - 28 * s
     local isz = 16 * s
     local x = x0
 
     local function button(id, path, w, on_click, color)
         local hot = layer:hovered(id)
         layer:draw(x, iy - isz / 2, color or t.text, hot and 255 or 215, path)
-        layer:hit(x - 10 * s, iy - 20 * s, w + 20 * s, 40 * s, { id = id, click = on_click })
+        layer:hit(x - 10 * s, iy - 18 * s, w + 20 * s, 36 * s, { id = id, click = on_click })
         x = x + w + 20 * s
     end
 
@@ -232,7 +235,7 @@ local function draw_impl()
         rx = rx - w
         local hot = layer:hovered(id)
         layer:draw(rx, iy - isz / 2, t.text, hot and 255 or (dim and 110 or 215), path)
-        layer:hit(rx - 10 * s, iy - 20 * s, w + 20 * s, 40 * s, { id = id, click = on_click })
+        layer:hit(rx - 10 * s, iy - 18 * s, w + 20 * s, 36 * s, { id = id, click = on_click })
         rx = rx - 20 * s
     end
 
@@ -283,7 +286,7 @@ end
 local function over_bar(x, y)
     local _, _, y0, s, vw, oh = geom()
     if x > vw then return false end
-    return y >= oh - 74 * s or y <= 52 * s or (y >= y0 - 20 * s)
+    return y >= oh - 86 * s or y <= 52 * s or (y >= y0 - 20 * s)
 end
 
 function M.init()
@@ -302,7 +305,7 @@ function M.init()
         end
         visible = true
         local x0, bw, y0, s = geom()
-        local on_track = y >= y0 - 14 * s and y <= y0 + 18 * s and x >= x0 - 6 * s and x <= x0 + bw + 6 * s
+        local on_track = y >= y0 - 12 * s and y <= y0 + 12 * s and x >= x0 - 6 * s and x <= x0 + bw + 6 * s
         local dur = mp.get_property_number("duration") or 0
         if on_track and dur > 0 then
             hover_time = util.clamp((x - x0) / bw, 0, 1) * dur
