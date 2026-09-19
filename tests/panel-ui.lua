@@ -314,9 +314,10 @@ end)
 
 -- ── 7. colour sliders ───────────────────────────────────────────────
 drag_steps(function()
+    -- the panel says where it drew the slider, so this does not have to guess
     local n = info()
-    local s = n.scale
-    local by = (34 * s + 6 * s) + 6 * s + 40 * s + 22 * s -- the first slider
+    local sl = (n.sliders or {}).brightness or {}
+    local by = sl.y or (n.oh * 0.3)
     return {
         from = { n.x0 + n.width * 0.5, by },
         points = { { n.x0 + n.width * 0.7, by }, { n.x0 + n.width * 0.85, by } },

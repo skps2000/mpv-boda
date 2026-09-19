@@ -15,6 +15,9 @@
 !tests/*.lua
 !docs/images/*.png
 !.github/workflows/*.yml
+!tools/*.py
+!tools/mdi/*.svg
+!tools/mdi/LICENSE
 
 # Backstop: these win over the rules above, so private files can never be
 # committed. They are anchored to the config folder itself -- without the

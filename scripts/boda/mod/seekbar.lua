@@ -187,7 +187,7 @@ local function draw_impl()
 
     local function button(id, path, w, on_click, color)
         local hot = layer:hovered(id)
-        layer:draw(x, iy - isz / 2, color or t.text, hot and 255 or 215, path)
+        layer:draw(x, iy - isz / 2, color or t.text, hot and ui.alpha.icon_hot or ui.alpha.icon, path)
         layer:hit(x - 10 * s, iy - 18 * s, w + 20 * s, 36 * s, { id = id, click = on_click })
         x = x + w + 20 * s
     end
@@ -234,7 +234,8 @@ local function draw_impl()
     local function rbutton(id, path, w, on_click, dim)
         rx = rx - w
         local hot = layer:hovered(id)
-        layer:draw(rx, iy - isz / 2, t.text, hot and 255 or (dim and 110 or 215), path)
+        layer:draw(rx, iy - isz / 2, t.text,
+            hot and ui.alpha.icon_hot or (dim and ui.alpha.icon_off or ui.alpha.icon), path)
         layer:hit(rx - 10 * s, iy - 18 * s, w + 20 * s, 36 * s, { id = id, click = on_click })
         rx = rx - 20 * s
     end

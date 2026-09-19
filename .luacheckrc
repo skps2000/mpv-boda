@@ -8,3 +8,9 @@ self = false
 -- how wide a line looks. Only code lines are measured, comments and strings are not.
 max_line_length = false
 max_code_line_length = 140
+
+-- lib/icons.lua is generated (tools/icons.py): one drawing path per line, and
+-- breaking them up would only make the diffs worse.
+files["scripts/boda/lib/icons.lua"] = {
+    max_code_line_length = false,
+}

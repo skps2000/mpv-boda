@@ -3,6 +3,7 @@
 local mp = require("mp")
 local util = require("lib.util")
 local ui = require("lib.ui")
+local icons = require("lib.icons")
 local state = require("lib.state")
 local t = require("lib.i18n").t
 
@@ -134,14 +135,16 @@ local function draw_impl()
             if it.clear then
                 local asking = arming(it.clear)
                 local label = asking and t("idle_confirm") or t("idle_clear")
-                local bw = util.text_width(label, 12 * s) + 20 * s
+                local bw = util.text_width(label, 12 * s) + 34 * s
                 local bx = pad + card_w - bw
                 local id = "clear" .. it.clear
                 local hot = layer:hovered(id)
                 layer:rect(bx, y + it.h - 26 * s, bw, 22 * s,
                     asking and th.accent or (hot and th.hover or th.bg2), asking and 220 or 150)
-                layer:text(bx + bw / 2, y + it.h - 23 * s, 12 * s,
-                    (asking or hot) and th.text or th.mute, 8, label)
+                local fg = (asking or hot) and th.text or th.mute
+                layer:icon(bx + 13 * s, y + it.h - 15 * s, 13 * s, fg,
+                    asking and ui.alpha.icon_hot or ui.alpha.icon, icons.get("clear", 13 * s))
+                layer:text(bx + bw / 2 + 7 * s, y + it.h - 23 * s, 12 * s, fg, 8, label)
                 local target = it.clear
                 buttons[target] = { x = bx + bw / 2, y = y + it.h - 15 * s,
                     w = bw, h = 26 * s, asking = asking }

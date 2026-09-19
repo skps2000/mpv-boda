@@ -43,6 +43,29 @@ local function build_theme()
     }
 end
 
+-- ── spacing and state ─────────────────────────────────────────────
+-- Everything sits on a 4px grid, and a surface reacts to the pointer by
+-- changing opacity rather than colour, so the whole UI answers the same way.
+function M.sp(n, s)
+    return n * 4 * (s or 1)
+end
+
+M.alpha = {
+    surface = 150,      -- a card or button at rest
+    surface_hot = 210,  -- under the pointer
+    surface_on = 255,   -- chosen
+    line = 160,         -- rules and tracks
+    icon = 215,
+    icon_hot = 255,
+    icon_off = 110,     -- something switched off
+}
+
+-- Pick the resting or hovered value in one step.
+function M.hot(hot, rest, over)
+    if hot then return over end
+    return rest
+end
+
 -- ── sizing ────────────────────────────────────────────────────────
 function M.osd_size()
     return mp.get_property_number("osd-width") or 0, mp.get_property_number("osd-height") or 0
@@ -103,6 +126,11 @@ end
 function Layer:draw(x, y, color, opacity, path)
     self:add(string.format("{\\an7\\pos(%.0f,%.0f)\\bord0\\shad0\\p1\\1c&H%s&\\1a&H%02X&}%s{\\p0}",
         x, y, color, 255 - (opacity or 255), path))
+end
+
+-- An icon centred on (x, y). Icons come from lib/icons.lua as 24-box paths.
+function Layer:icon(x, y, size, color, opacity, path)
+    self:draw(x - size / 2, y - size / 2, color, opacity, path)
 end
 
 function Layer:text(x, y, size, color, align, s, opacity)

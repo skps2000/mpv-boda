@@ -4,6 +4,7 @@ local mp = require("mp")
 local utils = require("mp.utils")
 local util = require("lib.util")
 local playlist = require("lib.playlist")
+local icons = require("lib.icons")
 local ui = require("lib.ui")
 local opts = require("lib.options")
 local state = require("lib.state")
@@ -23,18 +24,23 @@ local selected = nil -- last row clicked, zero based
 local stats = { sort_ms = 0, move_ms = 0, moves = 0, meta_ms = 0, meta_done = 0 }
 local draw -- wrapped with ui.guard below
 
+-- Where the colour sliders ended up, for the tests: they drag real pixels, and
+-- should not have to keep a copy of this layout in step with it.
+local sliders = {}
+
 local function publish()
+    info.sliders = sliders
     pcall(mp.set_property_native, "user-data/boda/panel", info)
 end
 
 local TABS = {
-    { id = "pl", key = "tab_playlist" },
-    { id = "audio", key = "tab_audio" },
-    { id = "sub", key = "tab_sub" },
-    { id = "video", key = "tab_video" },
-    { id = "chapter", key = "tab_chapter" },
-    { id = "fav", key = "tab_fav" },
-    { id = "color", key = "tab_color" },
+    { id = "pl", key = "tab_playlist", icon = "list" },
+    { id = "audio", key = "tab_audio", icon = "audio" },
+    { id = "sub", key = "tab_sub", icon = "subtitle" },
+    { id = "video", key = "tab_video", icon = "video" },
+    { id = "chapter", key = "tab_chapter", icon = "chapter" },
+    { id = "fav", key = "tab_fav", icon = "clip" },
+    { id = "color", key = "tab_color", icon = "color" },
 }
 
 local SORTS = {
@@ -55,18 +61,18 @@ local COLORS = {
 }
 
 local FAV_ACTIONS = {
-    { key = "fav_act_start", msg = "ab-a" },
-    { key = "fav_act_end", msg = "ab-b" },
-    { key = "fav_act_add", msg = "favorite-add" },
-    { key = "fav_act_clear", msg = "favorite-clear" },
+    { key = "fav_act_start", msg = "ab-a", icon = "mark_a" },
+    { key = "fav_act_end", msg = "ab-b", icon = "mark_b" },
+    { key = "fav_act_add", msg = "favorite-add", icon = "add" },
+    { key = "fav_act_clear", msg = "favorite-clear", icon = "clear" },
 }
 
 local ACTIONS = {
-    { key = "act_save", msg = "save-m3u" },
-    { key = "act_open", msg = "load-m3u" },
-    { key = "act_intro", msg = "mark-intro" },
-    { key = "act_outro", msg = "mark-outro" },
-    { key = "act_record", msg = "record" },
+    { key = "act_save", msg = "save-m3u", icon = "save" },
+    { key = "act_open", msg = "load-m3u", icon = "folder" },
+    { key = "act_intro", msg = "mark-intro", icon = "intro" },
+    { key = "act_outro", msg = "mark-outro", icon = "outro" },
+    { key = "act_record", msg = "record", icon = "record" },
 }
 
 -- ── metadata used for sorting ──────────────────────────────────────
@@ -391,6 +397,7 @@ local function draw_impl()
     local th = ui.theme
     local w = panel_width()
     local x0 = ow - w
+    sliders = {}
     info = { open = true, tab = tab, x0 = x0, width = w, oh = oh, ow = ow, scale = s,
         sort = state.prefs.sort, sort_desc = state.prefs.sort_desc, tabs = #TABS }
 
@@ -407,26 +414,32 @@ local function draw_impl()
         end,
     })
 
-    -- tabs
-    local tab_h = 38 * s
+    -- Tabs: an icon says which is which at a glance, the label spells it out.
+    local tab_h = 52 * s
     local tw = (w - 12 * s) / #TABS
-    local tab_fs = 13.5 * s
+    local tab_fs = 11.5 * s
     local longest = 0
     for _, def in ipairs(TABS) do
         longest = math.max(longest, util.text_width(t(def.key), tab_fs))
     end
     if longest > tw - 4 * s then
-        tab_fs = math.max(11 * s, tab_fs * (tw - 4 * s) / longest)
+        tab_fs = math.max(9.5 * s, tab_fs * (tw - 4 * s) / longest)
     end
     for i, def in ipairs(TABS) do
         local id = def.id
         local x = x0 + 6 * s + (i - 1) * tw
         local on = tab == id
-        layer:text_fit(x + tw / 2, 12 * s, tab_fs, on and th.text or th.mute, 8, t(def.key), tw - 2 * s)
+        local hot = layer:hovered("tab" .. id)
         if on then
-            layer:rect(x + 4 * s, 0, tw - 8 * s, tab_h - 4 * s, th.bg2, 200)
+            layer:rect(x + 4 * s, 0, tw - 8 * s, tab_h - 4 * s, th.bg2, ui.alpha.surface_on)
             layer:rect(x + 4 * s, tab_h - 5 * s, tw - 8 * s, 3 * s, th.accent, 255)
+        elseif hot then
+            layer:rect(x + 4 * s, 0, tw - 8 * s, tab_h - 4 * s, th.hover, ui.alpha.surface)
         end
+        local fg = (on or hot) and th.text or th.mute
+        layer:icon(x + tw / 2, 16 * s, 17 * s, fg, on and ui.alpha.icon_hot or ui.alpha.icon,
+            icons.get(def.icon, 17 * s))
+        layer:text_fit(x + tw / 2, 29 * s, tab_fs, fg, 8, t(def.key), tw - 2 * s)
         layer:hit(x, 0, tw, tab_h, {
             id = "tab" .. id,
             click = function()
@@ -465,6 +478,7 @@ local function draw_impl()
             layer:text_fit(x0 + 16 * s + util.text_width(t(c.key), 13.5 * s) + 8 * s, y + 1.5 * s,
                 10.5 * s, th.mute, 7, c.keys, w - 90 * s)
             local bx, by, bw2 = x0 + 16 * s, y + 22 * s, w - 32 * s
+            sliders[c.id] = { x = bx, y = by, w = bw2 }
             layer:rect(bx, by, bw2, 4 * s, th.track, 200)
             -- zero sits in the middle, so fill outwards from the centre
             local mid = bx + bw2 / 2
@@ -582,18 +596,21 @@ local function draw_impl()
             local btns = {} -- registered after the row so they sit on top of it
             if row.remove then
                 local rid = id .. "x"
-                layer:text(right, y + 7 * s, 15 * s, layer:hovered(rid) and th.text or th.mute, 9, "×")
+                local rhot = layer:hovered(rid)
+                layer:icon(right - 8 * s, y + row_h / 2 - s, 15 * s, rhot and th.text or th.mute,
+                    rhot and ui.alpha.icon_hot or ui.alpha.icon, icons.get("close", 15 * s))
                 btns[#btns + 1] = { right - 16 * s, 24 * s, rid, row.remove }
                 right = right - 22 * s
                 btn_w = btn_w + 22 * s
             end
             if row.loop then
                 local lid = id .. "r"
-                layer:text(right, y + 9 * s, 12 * s,
-                    layer:hovered(lid) and th.text or th.mute, 9, t("btn_loop"))
-                btns[#btns + 1] = { right - 34 * s, 40 * s, lid, row.loop }
-                right = right - 40 * s
-                btn_w = btn_w + 40 * s
+                local lhot = layer:hovered(lid)
+                layer:icon(right - 10 * s, y + row_h / 2 - s, 16 * s, lhot and th.text or th.mute,
+                    lhot and ui.alpha.icon_hot or ui.alpha.icon, icons.get("loop", 16 * s))
+                btns[#btns + 1] = { right - 22 * s, 28 * s, lid, row.loop }
+                right = right - 28 * s
+                btn_w = btn_w + 28 * s
             end
             local hint_w = (hint ~= "") and (util.text_width(hint, 12 * s) + 12 * s) or 0
             layer:text_fit(x0 + 18 * s, y + 8 * s, 14.5 * s,
@@ -631,7 +648,9 @@ local function draw_impl()
             layer:hit(ow - 14 * s, top, 14 * s, track_h,
                 { id = "scrollbar", press = to_scroll, drag = to_scroll })
         end
-        layer:text(x0 + 14 * s, oh - 21 * s, 12 * s, th.mute, 7, t("row_count", #rows))
+        -- above the action row when there is one, otherwise along the bottom
+        layer:text(x0 + 14 * s, oh - (acts and 70 or 21) * s, 12 * s, th.mute, 7,
+            t("row_count", #rows))
     end
 
     -- action row at the bottom
@@ -640,9 +659,15 @@ local function draw_impl()
         for i, a in ipairs(acts) do
             local x = x0 + 8 * s + (i - 1) * aw
             local id = "act" .. i
-            layer:text_fit(x + aw / 2, oh - 45 * s, 12.5 * s,
-                layer:hovered(id) and th.text or th.text2, 8, t(a.key), aw - 4 * s)
-            layer:hit(x, oh - 50 * s, aw, 22 * s, {
+            local hot = layer:hovered(id)
+            if hot then
+                layer:rect(x + 2 * s, oh - 56 * s, aw - 4 * s, 40 * s, th.hover, ui.alpha.surface)
+            end
+            local fg = hot and th.text or th.text2
+            layer:icon(x + aw / 2, oh - 46 * s, 16 * s, fg,
+                hot and ui.alpha.icon_hot or ui.alpha.icon, icons.get(a.icon, 16 * s))
+            layer:text_fit(x + aw / 2, oh - 35 * s, 11 * s, fg, 8, t(a.key), aw - 4 * s)
+            layer:hit(x, oh - 56 * s, aw, 40 * s, {
                 id = id,
                 click = function() mp.commandv("script-message", "boda-" .. a.msg) end,
             })
