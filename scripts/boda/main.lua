@@ -1,7 +1,7 @@
 -- boda — PotPlayer-style UI and keys for mpv (Windows)
 --
 -- Layout
---   lib/   shared: options, helpers, stored state, drawing + mouse input
+--   lib/   shared: options, helpers, stored state, playlist names, drawing + mouse input
 --   mod/   features: history, skip points, actions, open dialogs, seek bar, panel, idle screen
 --
 -- The script never grabs keys itself. Everything is reached from input.conf as
@@ -11,9 +11,12 @@ local mp = require("mp")
 local opts = require("lib.options")
 local ui = require("lib.ui")
 local state = require("lib.state")
+local playlist = require("lib.playlist")
 
 state.init()
 ui.init()
+-- before the modules below: it has to see the playlist as it arrives
+playlist.init()
 
 require("mod.history").init()
 require("mod.skip").init()

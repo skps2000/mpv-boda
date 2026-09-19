@@ -53,6 +53,10 @@ local function meta() return mp.get_property_native("user-data/boda/menu") or {}
 local function tree() return meta().tree or {} end
 
 -- find an entry by title, submenus included
+-- the extensions mpv counts as video, so the playlist can be checked against them
+local video_ext = {}
+for _, e in ipairs(mp.get_property_native("video-exts") or {}) do video_ext[e:lower()] = true end
+
 local function basename(path)
     return tostring(path):match("[^/\\]+$") or tostring(path)
 end
@@ -66,6 +70,22 @@ local function find(items, title)
         end
     end
     return nil
+end
+
+-- every "play this row" entry in the tree, keyed by its command so the reading
+-- survives the menu showing a different window of the playlist
+local function playlist_titles()
+    local out = {}
+    local function walk(items)
+        for _, it in ipairs(items or {}) do
+            if it.cmd and it.cmd:find("playlist%-play%-index") and it.title then
+                out[it.cmd] = it.title
+            end
+            if it.submenu then walk(it.submenu) end
+        end
+    end
+    walk(tree())
+    return out
 end
 
 local function has_state(it, want)
@@ -141,25 +161,46 @@ step(0.6, function()
     validate(t, "", problems)
     check("no empty commands or submenus", #problems == 0, table.concat(problems, " | "))
 
-    -- mpv fills a played entry's title in from the file's own metadata, so a row
-    -- must not be named after it: the list would rename itself as you watch.
-    local names = {}
+    -- only videos belong in the playlist: no music, images or playlist files
+    local wrong = {}
     for _, e in ipairs(mp.get_property_native("playlist") or {}) do
-        names[basename(e.filename or "")] = true
+        local ext = (e.filename or ""):lower():match("%.([%w]+)$")
+        if ext and not video_ext[ext] then wrong[#wrong + 1] = basename(e.filename) end
     end
-    local odd, seen = {}, 0
-    local function walk(items)
-        for _, it in ipairs(items or {}) do
-            if it.cmd and it.cmd:find("playlist%-play%-index") and it.title then
-                seen = seen + 1
-                if not names[it.title] then odd[#odd + 1] = it.title end
-            end
-            if it.submenu then walk(it.submenu) end
+    check("the playlist holds video files only", #wrong == 0, table.concat(wrong, " | "))
+end)
+
+-- A row must not rename itself when it is played: mpv fills an entry's title in
+-- from the file's own metadata, and a list that renames itself as you watch is
+-- unreadable. Names a playlist file gave its entries have to survive too.
+step(0.3, function() build("main") end)
+
+step(0.5, function()
+    saved.names = playlist_titles()
+    saved.named = 0
+    -- play the last row the menu is showing: the earlier stages may already have
+    -- played the ones near the top, and a row only renames itself once played
+    local last = -1
+    for cmd in pairs(saved.names) do
+        saved.named = saved.named + 1
+        local i = tonumber(cmd:match("(%d+)%s*$"))
+        if i and i > last then last = i end
+    end
+    if last >= 0 then mp.commandv("playlist-play-index", last) end
+end)
+
+step(1.4, function() build("main") end)
+
+step(0.6, function()
+    local now = playlist_titles()
+    local changed = {}
+    for cmd, was in pairs(saved.names) do
+        if now[cmd] and now[cmd] ~= was then
+            changed[#changed + 1] = was .. " -> " .. now[cmd]
         end
     end
-    walk(t)
-    check("playlist rows are named after the file", seen > 0 and #odd == 0,
-        string.format("%d rows, odd: %s", seen, table.concat(odd, " | ")))
+    check("a row keeps its name once it has been played", saved.named > 1 and #changed == 0,
+        string.format("%d rows, changed: %s", saved.named, table.concat(changed, " | ")))
 end)
 
 -- do check marks and disabled entries match reality

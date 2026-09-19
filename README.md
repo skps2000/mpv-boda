@@ -13,13 +13,17 @@ matter, inside the mpv window.
 ## What you get
 
 - **Open a folder** (F2) — recent folders come first, and the one you pick is walked
-  **all the way down**, so every video in every subfolder lands in the playlist
+  **all the way down**, so every video in every subfolder lands in the playlist. Only videos:
+  music, images and stray files are left out
 - **PotPlayer keys** — speed (Z/X/C), A-B loop (`[` `]`), bookmarks (P), frame step (D/F),
   colour (W–O), and the rest
 - **Side panel** (F6) — playlist · audio · subtitles · video · chapters · clips · colour as tabs.
   It pushes the video aside instead of covering it. Drag the left edge to resize freely
   (a plain click cycles preset widths), scroll with the wheel or the scrollbar, and one click
   plays a row
+- **Names you recognise** — a row is named after the file, not after whatever title is buried
+  inside it, so the list never renames itself as you watch. Open a playlist file and the names
+  it gives its entries are kept
 - **Continue watching** — when playback ends or you stop (Ctrl+F4), recent files come back with
   their progress. Number keys open them
 - **Menu** (right click or F4) — playback, open, playlist, clips, video, audio, subtitles, colour,

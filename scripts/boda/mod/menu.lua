@@ -6,6 +6,7 @@
 -- Where that is missing, the same tree is walked with mp.input.select instead.
 local mp = require("mp")
 local util = require("lib.util")
+local playlist = require("lib.playlist")
 local ui = require("lib.ui")
 local opts = require("lib.options")
 local state = require("lib.state")
@@ -116,7 +117,7 @@ local function playlist_items()
     local items = {}
     for i = first, last do
         local e = pl[i]
-        items[#items + 1] = item(util.entry_name(e),
+        items[#items + 1] = item(playlist.name(e),
             "playlist-play-index " .. (i - 1), { checked = e.current })
     end
     if #pl > last then
@@ -474,7 +475,7 @@ end
 local function playlist_menu(index)
     local pl = mp.get_property_native("playlist") or {}
     local e = pl[index + 1]
-    local name = e and util.entry_name(e) or t("menu_items")
+    local name = e and playlist.name(e) or t("menu_items")
     return {
         item(name, "", { disabled = true }),
         SEP,

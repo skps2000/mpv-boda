@@ -3,6 +3,7 @@
 local mp = require("mp")
 local utils = require("mp.utils")
 local util = require("lib.util")
+local playlist = require("lib.playlist")
 local ui = require("lib.ui")
 local opts = require("lib.options")
 local state = require("lib.state")
@@ -122,7 +123,7 @@ local function apply_sort()
     local rows = {}
     for i, e in ipairs(pl) do
         local path = e.filename or ""
-        local name = util.entry_name(e)
+        local name = playlist.name(e)
         local m = meta_of(path)
         local value
         if key == "size" then value = m.size
@@ -259,7 +260,7 @@ local function playlist_rows()
         -- One click plays the row. Clicking the row that is already playing does
         -- not restart it, so a second click cannot lose your place.
         rows[#rows + 1] = {
-            text = util.entry_name(e),
+            text = playlist.name(e),
             path = path,
             current = e.current,
             selected = (selected == idx),
