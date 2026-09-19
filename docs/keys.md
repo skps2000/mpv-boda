@@ -209,7 +209,7 @@ navigation all work. From a key it always opens the main menu, whatever the curs
 
 - **Over the video** — play/stop, open, continue watching, playlist, clips, chapters, speed,
   loop, skip, video, audio, subtitles, colour, window, capture, copy, panel, settings
-- **Over the playlist** — play this row, remove it, sort, open a folder
+- **Over the playlist** — play this row, show it in Explorer, remove it, sort, open a folder
 - **Idle screen** — opening things and recent files
 
 Change which groups appear with `menu_sections` in `script-opts/boda.conf`. To get mpv's default
@@ -222,6 +222,7 @@ Useful things left unbound. Add a line to `input.conf` to reach them.
 ```
 Ctrl+Alt+h   script-binding boda/history-clear      # forget the watch history
 Ctrl+Alt+f   script-binding boda/recent-clear       # forget the recent folders
+Ctrl+Alt+e   script-binding boda/reveal             # show the playing file in Explorer
 Ctrl+Alt+b   script-binding boda/bookmark-clear     # clear this file's bookmarks
 Ctrl+Alt+z   script-binding boda/speed-reset        # back to 1x
 Ctrl+Alt+o   script-binding boda/osd-toggle         # force the seek bar on/off

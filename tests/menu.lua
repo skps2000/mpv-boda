@@ -147,6 +147,16 @@ step(0.6, function()
     check("it reports what it built", meta().kind == "main", tostring(meta().kind))
     if not saved.custom then
         check("it has enough entries", saved.total > 80, saved.total .. " in total")
+        local opener
+        local function scan(items)
+            for _, it in ipairs(items or {}) do
+                if it.cmd == "script-binding boda/reveal" then opener = it end
+                if it.submenu then scan(it.submenu) end
+            end
+        end
+        scan(t)
+        check("what is playing can be shown in the file manager", opener ~= nil,
+            opener and opener.title or "no entry")
         local want = { "Open", "Playlist", "Clips", "Chapters · Bookmarks", "Speed", "Loop range",
             "Skip", "Video", "Audio", "Subtitles", "Color", "Window", "Capture · Record", "Copy",
             "Panel", "Settings · About" }
@@ -272,6 +282,20 @@ step(0.6, function()
     saved.playlist_menu_seen = meta().kind == "playlist"
     check("play and remove are there", find(t, "Play") ~= nil and find(t, "Remove from playlist") ~= nil)
     check("sorting is offered", find(t, "Sort") ~= nil)
+
+    -- showing the file in the system's file manager, for that row and no other
+    local reveal
+    local function look(items)
+        for _, it in ipairs(items or {}) do
+            if it.cmd and it.cmd:find("boda-reveal-index", 1, true) then reveal = it end
+            if it.submenu then look(it.submenu) end
+        end
+    end
+    look(t)
+    check("the row can be shown in the file manager", reveal ~= nil,
+        reveal and reveal.cmd or "no entry")
+    check("and it points at the row under the cursor",
+        reveal ~= nil and reveal.cmd:match("(%d+)%s*$") ~= nil, reveal and reveal.cmd)
     check("it is shorter than the main menu", count_all(t) < saved.total,
         count_all(t) .. " vs " .. saved.total)
     build("auto-key") -- cursor still over the row, but opened with a key

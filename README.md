@@ -29,7 +29,7 @@ matter, inside the mpv window.
   list can be cleared from the screen itself
 - **Menu** (right click or F4) — playback, open, playlist, clips, video, audio, subtitles, colour,
   window, capture, copy. Current state shows as check marks, and right-clicking a playlist row
-  gives you that row's menu
+  gives you that row's menu, including showing it in Explorer
 - **Command palette** (Ctrl+Shift+P) — everything the menu can do in one list. Type a few letters
   and it narrows: `deb` finds Deblock. Install [uosc](https://github.com/tomasklaen/uosc) and both
   the menu and the palette move into the player's own window instead

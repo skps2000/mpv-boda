@@ -221,6 +221,7 @@
 ```
 Ctrl+Alt+h   script-binding boda/history-clear      # 이어보기 기록 전체 삭제
 Ctrl+Alt+f   script-binding boda/recent-clear       # 최근 폴더 목록 삭제
+Ctrl+Alt+e   script-binding boda/reveal             # 재생 중인 파일을 탐색기에서 보기
 Ctrl+Alt+b   script-binding boda/bookmark-clear     # 이 파일의 북마크 삭제
 Ctrl+Alt+z   script-binding boda/speed-reset        # 속도 1배로
 Ctrl+Alt+o   script-binding boda/osd-toggle         # 탐색바 강제로 켜기/끄기

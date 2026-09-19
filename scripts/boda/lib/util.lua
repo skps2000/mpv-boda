@@ -138,6 +138,18 @@ function M.dirname(path)
     return (dir:gsub("[\\/]+$", ""))
 end
 
+-- Paths in the playlist can be relative to where mpv was started. Anything
+-- handed to another program has to be absolute.
+function M.absolute(path)
+    if not path or path == "" or M.is_url(path) then return path end
+    local drive = path:match("^%a:[\\/]")
+    local unc = path:match("^[\\/][\\/]")
+    if drive or unc or path:match("^/") then return path end
+    local cwd = mp.get_property("working-directory")
+    if not cwd or cwd == "" then return path end
+    return utils.join_path(cwd, path)
+end
+
 function M.is_url(path)
     return (tostring(path or "")):match("^%a[%w+%-.]*://") ~= nil
 end

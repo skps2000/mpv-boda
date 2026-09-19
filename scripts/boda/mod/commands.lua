@@ -543,12 +543,46 @@ function M.init()
         mp.command("rescan-external-files")
         osd(t("sub_rescan"))
     end)
+    -- Show a file where it lives, in whatever the system calls its file manager.
+    local function reveal(path)
+        path = util.absolute(path)
+        if not path or path == "" or util.is_url(path) then
+            osd(t("reveal_none"))
+            return
+        end
+        local args
+        local platform = mp.get_property("platform") or ""
+        if platform == "windows" then
+            -- /select, wants the comma glued to a backslash path
+            args = { "explorer.exe", "/select," .. path:gsub("/", "\\") }
+        elseif platform == "darwin" then
+            args = { "open", "-R", path }
+        else
+            args = { "xdg-open", util.dirname(path) or path }
+        end
+        mp.command_native_async({ name = "subprocess", playback_only = false,
+            detach = true, args = args }, function() end)
+    end
+
+    action("reveal", function() reveal(mp.get_property("path")) end)
+
+    -- the same, for a row of the playlist rather than what is playing
+    mp.register_script_message("boda-reveal-index", function(index)
+        local pl = mp.get_property_native("playlist") or {}
+        local e = pl[(tonumber(index) or -1) + 1]
+        reveal(e and e.filename)
+    end)
+
     action("open-config", function()
+        local dir = mp.command_native({ "expand-path", "~~/" })
+        local platform = mp.get_property("platform") or ""
+        local opener = (platform == "windows" and "explorer.exe")
+            or (platform == "darwin" and "open") or "xdg-open"
         mp.command_native_async({
             name = "subprocess",
             playback_only = false,
             detach = true,
-            args = { "explorer.exe", mp.command_native({ "expand-path", "~~/" }) },
+            args = { opener, dir },
         }, function() end)
     end)
     action("about", function()

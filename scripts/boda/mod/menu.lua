@@ -111,6 +111,20 @@ local function history_items()
 end
 
 -- A playlist can be long, so only show what is around the current entry.
+-- The word for the file manager depends on the system it is running on.
+local function reveal_label()
+    local platform = mp.get_property("platform")
+    if platform == "windows" then return t("menu_reveal_win") end
+    if platform == "darwin" then return t("menu_reveal_mac") end
+    return t("menu_reveal_other")
+end
+
+-- A stream or a URL has no folder to show.
+local function on_disk(entry)
+    local path = entry and entry.filename or mp.get_property("path")
+    return path ~= nil and path ~= "" and not util.is_url(path)
+end
+
 local function playlist_items()
     local pl = mp.get_property_native("playlist") or {}
     local cur = (mp.get_property_number("playlist-pos") or 0) + 1
@@ -265,6 +279,7 @@ sections.open = function(out)
         item(t("menu_open_clipboard"), bind("open-clipboard"), { key = "Ctrl+V" }),
         SEP,
         submenu(t("menu_recent_folders"), recent_folders()),
+        item(reveal_label(), bind("reveal"), { disabled = not on_disk() }),
         item(t("menu_reopen"), bind("reopen"), { key = "Ctrl+Y", disabled = not has_file() }),
     })
 end
@@ -519,6 +534,8 @@ local function playlist_menu(index)
         item(name, "", { disabled = true }),
         SEP,
         item(t("menu_this_item"), "playlist-play-index " .. index),
+        item(reveal_label(), "script-message boda-reveal-index " .. index,
+            { disabled = not on_disk(e) }),
         item(t("menu_remove"), "playlist-remove " .. index),
         SEP,
         submenu(t("menu_sort"), sort_items()),
