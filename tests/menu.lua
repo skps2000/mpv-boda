@@ -339,6 +339,46 @@ step(0.8, function()
     check("ESC closes it", console.open == false, "open=" .. tostring(console.open))
 end)
 
+-- How far the arrow keys seek is a setting the menu can change.
+step(0.3, function() build("main") end)
+
+step(0.5, function()
+    local group = find(tree(), "Seek")
+    saved.seek_group = group
+    check("the seek steps are in the menu", group ~= nil and #(group.submenu or {}) == 4,
+        group and (#(group.submenu or {}) .. " steps") or "no Seek group")
+    mp.commandv("script-message", "boda-seek-step", "arrow", "15")
+end)
+
+step(0.7, function() build("main") end)
+
+step(0.7, function()
+    local group = find(tree(), "Seek")
+    local arrows = (group or {}).submenu and group.submenu[1]
+    local ticked
+    for _, it in ipairs((arrows or {}).submenu or {}) do
+        if has_state(it, "checked") then ticked = it.title end
+    end
+    check("picking one changes the step", ticked == "15s", tostring(ticked))
+
+    -- from the start, paused: a short test clip cannot seek further than it runs
+    mp.set_property_bool("pause", true)
+    mp.commandv("seek", 0, "absolute")
+end)
+
+step(0.5, function()
+    saved.before_seek = mp.get_property_number("time-pos") or 0
+    saved.dur = mp.get_property_number("duration") or 0
+    mp.commandv("script-message", "boda-seek-forward")
+end)
+
+step(0.6, function()
+    local moved = (mp.get_property_number("time-pos") or 0) - saved.before_seek
+    local want = math.min(15, math.max(0, saved.dur - saved.before_seek))
+    check("and the arrow keys seek by it", math.abs(moved - want) < 1.5,
+        string.format("moved %.1fs, wanted %.1fs", moved, want))
+end)
+
 -- Errors are swallowed so a broken menu cannot kill the script; count them here.
 step(0.4, function()
     local e = mp.get_property_native("user-data/boda/errors") or {}

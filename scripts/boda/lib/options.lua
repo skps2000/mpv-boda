@@ -15,6 +15,11 @@ local M = {
     thumbnails = true,        -- seek bar previews (needs ffmpeg)
     ffmpeg = "",              -- path to ffmpeg (empty = look it up)
     wheel_volume = 5,         -- volume step for one wheel notch
+    -- how far the arrow keys seek, in seconds (the menu can change these too)
+    seek_arrow = 8,           -- ← →
+    seek_ctrl = 30,           -- Ctrl + ← →
+    seek_shift = 100,         -- Shift + ← →
+    seek_alt = 300,           -- Ctrl + Alt + ← →
     history_size = 60,        -- how many files to remember
     panel_width = 360,        -- default panel width in px
     state_dir = "",           -- where to keep history (empty = mpv state dir)

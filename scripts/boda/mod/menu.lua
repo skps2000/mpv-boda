@@ -199,6 +199,39 @@ local function speed_items()
     return items
 end
 
+-- How far the arrow keys seek. Each step is its own submenu of presets, with a
+-- prompt at the end for anything else.
+local SEEK_PRESETS = { 3, 5, 8, 10, 15, 30, 60, 100, 300, 600 }
+
+local function seek_label(v)
+    return v < 60 and t("seek_seconds", v) or util.fmt_time(v)
+end
+
+local function seek_items()
+    local steps = state.prefs.seek or {}
+    local items = {}
+    for _, which in ipairs({ "arrow", "ctrl", "shift", "alt" }) do
+        local cur = tonumber(steps[which]) or 0
+        local choices = {}
+        local listed = false
+        for _, v in ipairs(SEEK_PRESETS) do
+            if v == cur then listed = true end
+            choices[#choices + 1] = item(seek_label(v),
+                "script-message boda-seek-step " .. which .. " " .. v,
+                { checked = v == cur })
+        end
+        if not listed and cur > 0 then
+            choices[#choices + 1] = SEP
+            choices[#choices + 1] = item(seek_label(cur), "", { checked = true, disabled = true })
+        end
+        choices[#choices + 1] = SEP
+        choices[#choices + 1] = item(t("menu_seek_custom"),
+            "script-message boda-seek-ask " .. which)
+        items[#items + 1] = submenu(t("seek_" .. which) .. "   " .. seek_label(cur), choices)
+    end
+    return items
+end
+
 local function vf_on(label)
     return (mp.get_property("vf") or ""):find("@" .. label, 1, true) ~= nil
 end
@@ -273,6 +306,10 @@ end
 
 sections.speed = function(out)
     out[#out + 1] = submenu(t("menu_speed"), speed_items())
+end
+
+sections.seek = function(out)
+    out[#out + 1] = submenu(t("menu_seek"), seek_items())
 end
 
 sections.loop = function(out)
@@ -436,7 +473,7 @@ end
 
 local DEFAULT_ORDER = {
     "open", "resume", "-", "playlist", "fav", "chapter", "-",
-    "speed", "loop", "skip", "-", "video", "audio", "sub", "color", "-",
+    "speed", "seek", "loop", "skip", "-", "video", "audio", "sub", "color", "-",
     "window", "capture", "copy", "-", "panel", "settings",
 }
 

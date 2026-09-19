@@ -265,6 +265,41 @@ function M.init()
         osd(t("fav_removed"))
     end)
 
+    -- Seeking. How far each arrow-key step goes is a setting, so these go
+    -- through the script instead of a plain `seek` line in input.conf.
+    local function seek_by(which, dir)
+        local step = tonumber((state.prefs.seek or {})[which]) or 5
+        local pos = mp.get_property_number("time-pos")
+        if not pos then return end
+        local dur = mp.get_property_number("duration") or 0
+        local target = pos + dir * step
+        if dur > 0 then target = util.clamp(target, 0, dur) end
+        mp.commandv("seek", target, "absolute")
+        osd(util.fmt_time(target) .. (dur > 0 and (" / " .. util.fmt_time(dur)) or ""))
+    end
+    -- spelled out rather than built in a loop: input.conf names these, and CI
+    -- cross-checks that every name it calls is registered somewhere
+    local HELD = { repeatable = true }
+    action("seek-back", function() seek_by("arrow", -1) end, HELD)
+    action("seek-forward", function() seek_by("arrow", 1) end, HELD)
+    action("seek-back-ctrl", function() seek_by("ctrl", -1) end, HELD)
+    action("seek-forward-ctrl", function() seek_by("ctrl", 1) end, HELD)
+    action("seek-back-shift", function() seek_by("shift", -1) end, HELD)
+    action("seek-forward-shift", function() seek_by("shift", 1) end, HELD)
+    action("seek-back-alt", function() seek_by("alt", -1) end, HELD)
+    action("seek-forward-alt", function() seek_by("alt", 1) end, HELD)
+
+    -- the menu sets these; kept in prefs so a change survives a restart
+    mp.register_script_message("boda-seek-step", function(which, value)
+        local n = tonumber(value)
+        if not n or not state.prefs.seek or state.prefs.seek[which] == nil then return end
+        state.prefs.seek[which] = util.clamp(math.floor(n + 0.5), 1, 36000)
+        state.mark("prefs")
+        state.flush()
+        mp.commandv("script-message", "boda-refresh")
+        osd(t("seek_step_set", t("seek_" .. which), util.fmt_time(state.prefs.seek[which])))
+    end)
+
     -- jumping around
     action("jump-start", function()
         mp.commandv("seek", 0, "absolute")

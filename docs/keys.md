@@ -43,10 +43,16 @@ and editing that file is all it takes to change them.
 | `Space` | Play / pause |
 | `PgUp` / `PgDn` | Previous / next file |
 | `Del` | Remove from the playlist (the row you last clicked, else the playing one) |
-| `←` `→` | 5 seconds |
+| `←` `→` | 8 seconds |
 | `Ctrl+←` `Ctrl+→` | 30 seconds |
-| `Shift+←` `Shift+→` | 60 seconds |
+| `Shift+←` `Shift+→` | 1 min 40 s |
 | `Ctrl+Alt+←` `Ctrl+Alt+→` | 5 minutes |
+
+Those four steps are settings: **Menu › Seek**, or `seek_arrow` / `seek_ctrl` / `seek_shift` /
+`seek_alt` in `script-opts/boda.conf`. What you pick in the menu is remembered.
+
+| Key | Action |
+|---|---|
 | `Ctrl+Shift+←` `Ctrl+Shift+→` | Keyframe by keyframe |
 | `D` | Previous frame |
 | `F` | Next frame |
@@ -214,6 +220,7 @@ Useful things left unbound. Add a line to `input.conf` to reach them.
 
 ```
 Ctrl+Alt+h   script-binding boda/history-clear      # forget the watch history
+Ctrl+Alt+f   script-binding boda/recent-clear       # forget the recent folders
 Ctrl+Alt+b   script-binding boda/bookmark-clear     # clear this file's bookmarks
 Ctrl+Alt+z   script-binding boda/speed-reset        # back to 1x
 Ctrl+Alt+o   script-binding boda/osd-toggle         # force the seek bar on/off

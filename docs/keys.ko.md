@@ -42,10 +42,17 @@
 | `Space` | 재생 / 일시정지 |
 | `PgUp` / `PgDn` | 이전 / 다음 파일 |
 | `Del` | 재생목록에서 빼기 (마지막으로 누른 항목, 없으면 재생 중인 것) |
-| `←` `→` | 5초 이동 |
+| `←` `→` | 8초 이동 |
 | `Ctrl+←` `Ctrl+→` | 30초 이동 |
-| `Shift+←` `Shift+→` | 60초 이동 |
+| `Shift+←` `Shift+→` | 1분 40초 이동 |
 | `Ctrl+Alt+←` `Ctrl+Alt+→` | 5분 이동 |
+
+이 네 가지 간격은 설정입니다. **메뉴 › 구간 이동**에서 고르거나
+`script-opts/boda.conf` 의 `seek_arrow` / `seek_ctrl` / `seek_shift` / `seek_alt` 로 정합니다.
+메뉴에서 고른 값은 다음에도 유지됩니다.
+
+| 키 | 동작 |
+|---|---|
 | `Ctrl+Shift+←` `Ctrl+Shift+→` | 키프레임 단위 이동 |
 | `D` | 이전 프레임 |
 | `F` | 다음 프레임 |
@@ -212,6 +219,7 @@
 
 ```
 Ctrl+Alt+h   script-binding boda/history-clear      # 이어보기 기록 전체 삭제
+Ctrl+Alt+f   script-binding boda/recent-clear       # 최근 폴더 목록 삭제
 Ctrl+Alt+b   script-binding boda/bookmark-clear     # 이 파일의 북마크 삭제
 Ctrl+Alt+z   script-binding boda/speed-reset        # 속도 1배로
 Ctrl+Alt+o   script-binding boda/osd-toggle         # 탐색바 강제로 켜기/끄기

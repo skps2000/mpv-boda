@@ -212,6 +212,18 @@ if ($f.ShowDialog() -eq 'OK') { $f.FileName }
         end)
     end)
 
+    -- The menu's "type a value" for a seek step.
+    mp.register_script_message("boda-seek-ask", function(which)
+        if not which then return end
+        local cur = (state.prefs.seek or {})[which]
+        ask(t("menu_seek_ask"), tostring(cur or ""), function(text)
+            local n = tonumber((text:gsub("[^%d%.]", "")))
+            if n and n > 0 then
+                mp.commandv("script-message", "boda-seek-step", which, tostring(n))
+            end
+        end)
+    end)
+
     -- The clipboard is read straight from an mpv property, no PowerShell needed.
     action("open-clipboard", function()
         local text = mp.get_property("clipboard/text")

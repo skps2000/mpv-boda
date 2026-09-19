@@ -44,6 +44,14 @@ function M.init()
         sort_desc = p.sort_desc == true,
         auto_color = p.auto_color,
     }
+    -- seek steps: the setting file is the default, the menu overrides it
+    local seek = p.seek or {}
+    M.prefs.seek = {
+        arrow = tonumber(seek.arrow) or opts.seek_arrow,
+        ctrl = tonumber(seek.ctrl) or opts.seek_ctrl,
+        shift = tonumber(seek.shift) or opts.seek_shift,
+        alt = tonumber(seek.alt) or opts.seek_alt,
+    }
     if M.prefs.auto_color == nil then M.prefs.auto_color = opts.auto_color end
 
     mp.register_event("shutdown", M.flush)
@@ -67,6 +75,7 @@ function M.flush()
             sort = M.prefs.sort,
             sort_desc = M.prefs.sort_desc,
             auto_color = M.prefs.auto_color,
+            seek = M.prefs.seek,
         })
     end
     dirty = {}
