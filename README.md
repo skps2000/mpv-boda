@@ -24,8 +24,9 @@ matter, inside the mpv window.
 - **Names you recognise** — a row is named after the file, not after whatever title is buried
   inside it, so the list never renames itself as you watch. Open a playlist file and the names
   it gives its entries are kept
-- **Continue watching** — when playback ends or you stop (Ctrl+F4), recent files come back with
-  their progress. Number keys open them
+- **Continue watching** — when playback ends or you stop (Ctrl+F4), the folders you were working
+  through come back first, then the files with their progress. Number keys open them, and either
+  list can be cleared from the screen itself
 - **Menu** (right click or F4) — playback, open, playlist, clips, video, audio, subtitles, colour,
   window, capture, copy. Current state shows as check marks, and right-clicking a playlist row
   gives you that row's menu
@@ -70,7 +71,7 @@ The ones you reach for. The full list is in [docs/keys.md](docs/keys.md).
 | Key | Action |
 |---|---|
 | `Space` | Play / pause |
-| `←` `→` | 5 s (Ctrl 30 s, Shift 60 s) |
+| `←` `→` | 8 s (Ctrl 30 s, Shift 1:40) — all four steps are settings |
 | `↑` `↓` / wheel | Volume |
 | `Z` `X` `C` | Speed: back to normal / slower / faster |
 | `D` `F` | Previous / next frame |
@@ -105,6 +106,10 @@ only place to edit.
 | `thumbnails` | `yes` | Seek bar previews (needs ffmpeg) |
 | `ffmpeg` | (auto) | Path to ffmpeg |
 | `wheel_volume` | `5` | Volume per wheel notch |
+| `seek_arrow` | `8` | How far `←` `→` seek, in seconds |
+| `seek_ctrl` | `30` | How far `Ctrl+←` `Ctrl+→` seek |
+| `seek_shift` | `100` | How far `Shift+←` `Shift+→` seek |
+| `seek_alt` | `300` | How far `Ctrl+Alt+←` `Ctrl+Alt+→` seek |
 | `history_size` | `60` | Files kept on the continue-watching screen |
 | `panel_width` | `360` | Default panel width, px |
 | `menu_sections` | (default) | Which groups the menu shows, and in what order |

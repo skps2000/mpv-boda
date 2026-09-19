@@ -518,6 +518,29 @@ step(1.2, function()
     check("the idle screen comes up", n.active == true, tostring(n.active))
     check("it lists what was watched", (n.rows or 0) > 0 and (n.shown or 0) > 0,
         string.format("rows=%s shown=%s", tostring(n.rows), tostring(n.shown)))
+    saved.idle_rows = n.rows
+end)
+
+-- Clearing a list asks first, so one stray click cannot wipe the history.
+step(0.3, function()
+    local b = (idle_info().buttons or {})["history-clear"]
+    saved.clear_btn = b
+    if b then click(b.x, b.y) end
+end)
+
+step(0.6, function()
+    local n = idle_info()
+    local b = (n.buttons or {})["history-clear"]
+    check("clearing asks before it wipes anything",
+        saved.clear_btn ~= nil and b ~= nil and b.asking == true and n.rows == saved.idle_rows,
+        string.format("asking=%s rows=%s", tostring(b and b.asking), tostring(n.rows)))
+    if b then click(b.x, b.y) end
+end)
+
+step(0.8, function()
+    local n = idle_info()
+    check("the second click clears it", (n.rows or 0) < (saved.idle_rows or 0),
+        string.format("rows=%s was %s", tostring(n.rows), tostring(saved.idle_rows)))
 end)
 
 -- A draw that throws is swallowed so one bad screen cannot kill the script, so

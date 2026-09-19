@@ -76,11 +76,25 @@ function M.init()
         mp.set_property_bool("pause", false)
     end)
 
-    mp.add_key_binding(nil, "history-clear", function()
+    local function action(name, fn)
+        mp.add_key_binding(nil, name, fn)
+        mp.register_script_message("boda-" .. name, fn)
+    end
+
+    action("history-clear", function()
         state.history = {}
         state.mark("history")
         state.flush()
+        mp.commandv("script-message", "boda-refresh")
         mp.osd_message(t("history_cleared"))
+    end)
+
+    action("recent-clear", function()
+        state.recent = {}
+        state.mark("prefs")
+        state.flush()
+        mp.commandv("script-message", "boda-refresh")
+        mp.osd_message(t("recent_cleared"))
     end)
 end
 

@@ -27,7 +27,7 @@ Select-String -Path "$env:TEMP\boda-test.log" -Pattern '\] T ' |
     ForEach-Object { $_.Line -replace '^.*\] T ', '' }
 ```
 
-A line like `RESULT 44 pass / 0 fail` means everything worked. Any failure makes mpv exit with
+A line like `RESULT 46 pass / 0 fail` means everything worked. Any failure makes mpv exit with
 code 1.
 
 ## What they cover
@@ -46,13 +46,14 @@ code 1.
 | Seek bar | its buttons still work with the panel open |
 | Window size | the panel stays put across fullscreen |
 | Stop | the panel gets out of the way and the continue-watching screen comes up |
+| Continue watching | folders first, and clearing a list asks before it wipes anything |
 | Errors | nothing threw while drawing (a swallowed error still fails the run) |
 
 ## Menu tests
 
 `tests/menu.lua` builds the menu tree and checks its contents, its state and how it changes with
 context, including that playlist rows are named after the file rather than whatever title mpv
-reads out of it. Actually showing the menu (`context-menu`) blocks until someone dismisses it, so
+reads out of it, and that the seek steps the menu sets really are what the arrow keys use. Actually showing the menu (`context-menu`) blocks until someone dismisses it, so
 the tests stop at building the tree.
 
 ```powershell

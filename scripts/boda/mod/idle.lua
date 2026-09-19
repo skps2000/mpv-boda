@@ -19,31 +19,45 @@ local function play(path)
 end
 
 -- Build the rows first: their heights decide how many fit on screen.
+-- Folders come first: picking up a folder you were working through is the more
+-- common way back in than a single file.
 local function build(s)
     local items = {}
+    if #(state.recent or {}) > 0 then
+        items[#items + 1] = { kind = "header", text = t("idle_recent_folders"),
+            clear = "recent-clear", h = 34 * s }
+        for _, dir in ipairs(state.recent) do
+            items[#items + 1] = { kind = "folder", path = dir, h = 32 * s }
+        end
+    end
     local history = state.history or {}
     if #history > 0 then
-        items[#items + 1] = { kind = "header", text = t("idle_recent_videos"), h = 30 * s }
+        items[#items + 1] = { kind = "header", text = t("idle_recent_videos"),
+            clear = "history-clear", h = 34 * s }
         for _, h in ipairs(history) do
             if h.path then
                 items[#items + 1] = { kind = "video", entry = h, h = 56 * s }
             end
         end
     end
-    if #(state.recent or {}) > 0 then
-        items[#items + 1] = { kind = "header", text = t("idle_recent_folders"), h = 34 * s }
-        for _, dir in ipairs(state.recent) do
-            items[#items + 1] = { kind = "folder", path = dir, h = 32 * s }
-        end
-    end
     return items
 end
 
--- What the tests read: whether the screen is up and how much of it was drawn.
+-- Clearing a list takes two clicks: the button asks first, and forgets it was
+-- asked after a few seconds.
+local armed, armed_until = nil, 0
+local function arming(which)
+    return armed == which and mp.get_time() < armed_until
+end
+
+-- What the tests read: whether the screen is up, how much of it was drawn, and
+-- where the clear buttons ended up.
+local buttons = {}
+
 local function publish(rows, shown, max_scroll)
     mp.set_property_native("user-data/boda/idle", {
         active = active, rows = rows or 0, shown = shown or 0,
-        scroll = scroll, max_scroll = max_scroll or 0,
+        scroll = scroll, max_scroll = max_scroll or 0, buttons = buttons,
     })
 end
 
@@ -73,6 +87,7 @@ local function draw_impl()
 
     local items = build(s)
     visible_items = {}
+    buttons = {}
 
     if #items == 0 then
         layer:text_fit(pad, top + 10 * s, 14 * s, th.mute, 7, t("idle_empty"), ow - pad * 2)
@@ -115,7 +130,42 @@ local function draw_impl()
         shown = shown + 1
 
         if it.kind == "header" then
-            layer:text_fit(pad, y + it.h - 18 * s, 12 * s, th.mute, 7, it.text, card_w)
+            local label_w = card_w
+            if it.clear then
+                local asking = arming(it.clear)
+                local label = asking and t("idle_confirm") or t("idle_clear")
+                local bw = util.text_width(label, 12 * s) + 20 * s
+                local bx = pad + card_w - bw
+                local id = "clear" .. it.clear
+                local hot = layer:hovered(id)
+                layer:rect(bx, y + it.h - 26 * s, bw, 22 * s,
+                    asking and th.accent or (hot and th.hover or th.bg2), asking and 220 or 150)
+                layer:text(bx + bw / 2, y + it.h - 23 * s, 12 * s,
+                    (asking or hot) and th.text or th.mute, 8, label)
+                local target = it.clear
+                buttons[target] = { x = bx + bw / 2, y = y + it.h - 15 * s,
+                    w = bw, h = 26 * s, asking = asking }
+                layer:hit(bx, y + it.h - 28 * s, bw, 26 * s, {
+                    id = id,
+                    click = function()
+                        if arming(target) then
+                            armed = nil
+                            mp.commandv("script-message", "boda-" .. target)
+                        else
+                            armed, armed_until = target, mp.get_time() + 4
+                            mp.add_timeout(4.1, function()
+                                if not arming(target) then
+                                    armed = nil
+                                    draw()
+                                end
+                            end)
+                        end
+                        draw()
+                    end,
+                })
+                label_w = card_w - bw - 10 * s
+            end
+            layer:text_fit(pad, y + it.h - 18 * s, 12 * s, th.mute, 7, it.text, label_w)
         elseif it.kind == "video" then
             local h = it.entry
             local id = "v" .. i
@@ -188,6 +238,7 @@ function M.init()
     layer.redraw = draw
 
     mp.observe_property("path", "string", function() update() end)
+    mp.register_script_message("boda-refresh", function() draw() end)
     mp.register_event("end-file", function() mp.add_timeout(0.05, update) end)
     mp.register_event("file-loaded", update)
 
