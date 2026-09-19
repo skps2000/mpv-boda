@@ -25,6 +25,8 @@ boda는 팟플레이어 단축키를 그대로 옮기고, 자주 쓰는 UI만 mp
 - **아래쪽 탐색바** — 클릭 탐색, 챕터 표시, A-B 구간 표시, 볼륨, 마우스 올리면 미리보기(ffmpeg 필요)
 - **메뉴** (우클릭 또는 F4) — 재생·열기·목록·즐겨찾기·영상·소리·자막·색감·창·캡처·복사를 한 곳에서.
   현재 상태가 체크로 보이고, 목록 위에서 누르면 그 항목 메뉴가 뜹니다 (구성은 설정에서 바꿀 수 있음)
+- **명령 팔레트** (Ctrl+Shift+P) — 메뉴에 있는 모든 것이 한 목록에. 몇 글자만 치면 좁혀집니다.
+  [uosc](https://github.com/tomasklaen/uosc) 를 깔아두면 메뉴와 팔레트가 창 안에서 열립니다
 - **즐겨찾기** (`+`) — 지금 장면을 담아두고, 목록에서 누르면 그 지점부터 재생됩니다.
   `[` `]` 로 구간을 먼저 정하면 구간째로 담기고 "반복" 버튼이 붙습니다
 - **오프닝/엔딩 스킵** (Ctrl+I / Ctrl+O) — 파일마다 지점을 기억했다가 다음부터 자동으로 넘깁니다
@@ -34,6 +36,8 @@ boda는 팟플레이어 단축키를 그대로 옮기고, 자주 쓰는 UI만 mp
 ![목록 패널](docs/images/panel.png)
 
 ![즐겨찾기 구간](docs/images/clips.png)
+
+![명령 팔레트](docs/images/palette.png)
 
 ![색감 패널](docs/images/color.png)
 
@@ -106,6 +110,7 @@ zip으로 받으려면 [Releases](https://github.com/skps2000/mpv-boda/releases)
 | `panel_width` | `360` | 목록 패널 기본 너비(px) |
 | `state_dir` | (자동) | 기록 저장 폴더 |
 | `menu_sections` | (기본) | 우클릭 메뉴에 넣을 묶음과 순서 |
+| `uosc` | `yes` | uosc 가 설치돼 있으면 메뉴를 uosc 로 그리기 |
 
 ## 기록은 어디에 저장되나
 
@@ -166,6 +171,9 @@ scripts/boda/
 ## 라이선스
 
 [MIT](LICENSE)
+
+아이콘은 구글 [Material Symbols](https://fonts.google.com/icons) (Apache-2.0) 를 SVG 에서
+그리기 명령으로 바꿔 쓴 것입니다. 변환은 `tools/icons.py`, 라이선스는 `tools/mdi/LICENSE`.
 
 mpv와 팟플레이어는 각각의 프로젝트/회사 것이며, 이 저장소와는 관계가 없습니다.
 "팟플레이어 스타일"은 단축키 배치를 따라했다는 뜻입니다.

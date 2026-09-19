@@ -24,6 +24,7 @@ local M = {
     panel_width = 360,        -- default panel width in px
     state_dir = "",           -- where to keep history (empty = mpv state dir)
     menu_sections = "",       -- context menu layout (empty = default order)
+    uosc = true,              -- let uosc draw the menus when it is installed
 }
 
 local subscribers = {}

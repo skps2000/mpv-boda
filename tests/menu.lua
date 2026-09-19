@@ -379,6 +379,29 @@ step(0.6, function()
         string.format("moved %.1fs, wanted %.1fs", moved, want))
 end)
 
+-- The command palette is the same tree flattened, searched in mpv's console.
+step(0.3, function()
+    mp.set_property("vf", "")
+    mp.commandv("script-message", "boda-palette")
+end)
+
+step(0.9, function()
+    local console = mp.get_property_native("user-data/mpv/console") or {}
+    local pal = mp.get_property_native("user-data/boda/palette") or {}
+    check("the palette lists what the menu can do", console.open == true and (pal.count or 0) > 80,
+        string.format("open=%s entries=%s", tostring(console.open), tostring(pal.count)))
+    for _, ch in ipairs({ "d", "e", "b" }) do mp.commandv("keypress", ch) end
+end)
+
+step(0.8, function() mp.commandv("keypress", "ENTER") end)
+
+step(0.8, function()
+    check("typing narrows it, and Enter runs what is left",
+        (mp.get_property("vf") or ""):find("deblock", 1, true) ~= nil,
+        "vf=" .. tostring(mp.get_property("vf")))
+    mp.set_property("vf", "")
+end)
+
 -- Errors are swallowed so a broken menu cannot kill the script; count them here.
 step(0.4, function()
     local e = mp.get_property_native("user-data/boda/errors") or {}

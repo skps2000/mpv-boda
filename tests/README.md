@@ -70,6 +70,21 @@ To cover the `menu_sections` setting too (it contains commas, so wrap it in `%le
 --script-opts=boda-state_dir=...,boda-menu_sections=%19%open,fav,-,settings
 ```
 
+## The uosc bridge
+
+`tests/uosc.lua` pretends to be [uosc](https://github.com/tomasklaen/uosc): it announces itself
+the way uosc does, takes the menu boda hands over, answers with the callback uosc would send, and
+checks boda acted on it. So the bridge is covered without uosc being installed.
+
+```powershell
+mpv --script="$env:APPDATA\mpv\tests\uosc.lua" `
+    --script-opts=boda-state_dir=$env:TEMP\boda-test `
+    --log-file="$env:TEMP\boda-uosc.log" "D:\Videos\Series\first.mkv"
+```
+
+It is a stand-in, not uosc itself: it proves boda sends what it means to send and acts on the
+answer, not that uosc likes the payload. Install uosc to confirm that end.
+
 ## Notes
 
 - The cursor moves by itself while they run. Do not start them mid-task, and run one at a time:

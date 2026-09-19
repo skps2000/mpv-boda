@@ -10,6 +10,8 @@ local playlist = require("lib.playlist")
 local ui = require("lib.ui")
 local opts = require("lib.options")
 local state = require("lib.state")
+local uosc = require("lib.uosc")
+local palette = require("mod.palette")
 local t = require("lib.i18n").t
 
 local M = {}
@@ -612,6 +614,9 @@ local function show(from_mouse)
     local items, kind = pick_menu(from_mouse)
     M.last_kind = kind
     M.last_items = items
+    -- uosc draws it in the player's own style, with search; without uosc this
+    -- does nothing and the native window menu takes over as before
+    if uosc.open(items, t("menu_title"), false) then return end
     if native_ok ~= false then
         local ok = pcall(mp.set_property_native, "menu-data", items)
         if ok then
@@ -630,6 +635,16 @@ local function show(from_mouse)
 end
 
 function M.init()
+    uosc.init()
+
+    -- Everything the menu can do, in one searchable list.
+    mp.add_key_binding(nil, "palette", function()
+        palette.open(main_menu(), t("palette_title"))
+    end)
+    mp.register_script_message("boda-palette", function()
+        palette.open(main_menu(), t("palette_title"))
+    end)
+
     -- complex bindings tell us whether a mouse button or a key triggered this
     mp.add_key_binding(nil, "menu", function(e)
         if e and e.event and e.event ~= "down" and e.event ~= "press" then return end

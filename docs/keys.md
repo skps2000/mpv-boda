@@ -15,6 +15,7 @@ and editing that file is all it takes to change them.
 | `F2` | Open folder (recent folders first, then everything below the one you pick) |
 | `F3` / `F12` | Open file |
 | `F4` | Menu |
+| `Ctrl+Shift+P` | Command palette (type to find anything the menu can do) |
 | `Ctrl+F4` | Stop (back to the idle screen) |
 | `F5` / `Ctrl+F` | Open the config folder |
 | `F6` | Playlist panel |

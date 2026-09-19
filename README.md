@@ -30,6 +30,9 @@ matter, inside the mpv window.
 - **Menu** (right click or F4) — playback, open, playlist, clips, video, audio, subtitles, colour,
   window, capture, copy. Current state shows as check marks, and right-clicking a playlist row
   gives you that row's menu
+- **Command palette** (Ctrl+Shift+P) — everything the menu can do in one list. Type a few letters
+  and it narrows: `deb` finds Deblock. Install [uosc](https://github.com/tomasklaen/uosc) and both
+  the menu and the palette move into the player's own window instead
 - **Clips** (`+`) — save this moment, click it later to play from there. Set `[` and `]` first and
   the whole range is saved, with a Loop button
 - **Skip intro and outro** (Ctrl+I / Ctrl+O) — remembered per file and skipped next time
@@ -40,6 +43,8 @@ matter, inside the mpv window.
 ![Playlist panel](docs/images/panel.png)
 
 ![Saved clips](docs/images/clips.png)
+
+![Command palette](docs/images/palette.png)
 
 ![Colour panel](docs/images/color.png)
 
@@ -80,6 +85,7 @@ The ones you reach for. The full list is in [docs/keys.md](docs/keys.md).
 | `P` | Bookmark (Shift+PgUp / PgDn to jump) |
 | `F2` `F3` | Open folder / file |
 | `F4` | Menu (same as right click) |
+| `Ctrl+Shift+P` | Command palette |
 | `F6` `F7` | Playlist panel / colour panel |
 | `F9` `F10` | Sharp upscale / PiP |
 | `Ctrl+I` `Ctrl+O` | Mark end of intro / start of outro |
@@ -113,6 +119,7 @@ only place to edit.
 | `history_size` | `60` | Files kept on the continue-watching screen |
 | `panel_width` | `360` | Default panel width, px |
 | `menu_sections` | (default) | Which groups the menu shows, and in what order |
+| `uosc` | `yes` | Let uosc draw the menus when it is installed |
 | `state_dir` | (auto) | Where history is stored |
 
 ## Where your history goes
@@ -175,6 +182,9 @@ button, whichever armed last swallows the clicks.
 ## Licence
 
 [MIT](LICENSE)
+
+Icons are Google's [Material Symbols](https://fonts.google.com/icons), Apache-2.0, converted from
+SVG to drawing commands by `tools/icons.py`; the licence is in `tools/mdi/LICENSE`.
 
 mpv and PotPlayer belong to their own projects and companies; this repository is not affiliated
 with either. "PotPlayer-style" only means the key layout was copied.
